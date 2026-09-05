@@ -19,3 +19,5 @@
 | D-015 | A signal that cannot discriminate on a given ledger abstains rather than flagging everything. | Decided | `rare_account_pair` flagged 95% of VynFi; `off_hours_posting` would flag 100% of it. ADR-0004. |
 | D-016 | Detector thresholds frozen in ADR-0004 and reported only on held-out seeds 101-105. | Decided | ADR-0003 rule 4. Thresholds were developed against seed 20250906 over several iterations. |
 | D-017 | Signals stay independent in Phase 2; no fusion or scoring until Phase 4. | Decided | A reviewer must see which concern fired, not an opaque number. |
+| D-018 | The generator models a ledger with an opening position and linked transaction cycles, not a stream of independent vouchers. | Decided | An internal CA review found the bank overdrawn by Rs 5.58 crore, fixed assets in credit and a year of unpaid TDS. docs/ca_validation/findings.md. |
+| D-019 | Balance-sheet coherence is enforced by tests that read the trial balance, not only per-voucher tests. | Decided | None of the Phase 1 tests could see a defect that only appears in aggregate. |

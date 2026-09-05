@@ -30,7 +30,9 @@ They are **defaults for a mid-size Indian firm, not truths.** A delegation limit
 
 ## Held-out result (seeds 101–105, never used while developing the thresholds)
 
-4,000 vouchers per seed, 2% planted anomaly rate, 5% decoys.
+4,000 vouchers per seed, 2% planted anomaly rate, 5% decoys. **Re-run after the
+ledger was restructured** following the internal CA review
+(`docs/ca_validation/findings.md`), which changed the population substantially.
 
 | Signal | Mean recall | Min | Trap false positives |
 |---|---|---|---|
@@ -42,12 +44,34 @@ They are **defaults for a mid-size Indian firm, not truths.** A delegation limit
 | `rare_account_pair` | 100% | 100% | 0 |
 | `threshold_adjacent` | 100% | 100% | 0 |
 | `missing_evidence` | 100% | 100% | 0 |
-| **`unusual_preparer_account`** | **98%** | **88%** | 0 |
+| **`unusual_preparer_account`** | **90%** | **75%** | 0 |
 | `post_close_entry` | 100% | 100% | 0 |
 
-**Queue: 5.0% of vouchers**, containing **100%** of planted anomalies (min 99% on any seed), with **0 of 1,000 decoys** wrongly queued across all five seeds.
+**Queue: 5.9% of vouchers**, containing 100% of planted anomalies on every seed,
+with **0 of 1,000 decoys** wrongly queued.
 
-`unusual_preparer_account` is population-dependent — it needs the account to have a clear regular owner — so it varies between ledgers. Its test floor is 0.75, deliberately below the observed minimum: a floor tuned to the observed number would be a floor tuned to this benchmark.
+`unusual_preparer_account` needs the account to have a clear regular owner, and
+not every account in a realistic ledger does — Sundry Creditors, for instance, is
+shared between purchasing and treasury. Its test floor is 0.60, below the
+observed 75% minimum on purpose: a floor pinned to the observed number is a
+floor tuned to this benchmark.
+
+`threshold_adjacent` is the lowest-precision signal (about 5%). Sitting under a
+delegation limit without an approver is the ordinary case for a small payment,
+not a rare one. It is kept because structuring is a real concern, but it is a
+weak signal on its own and is a candidate for low weighting in Phase 4 fusion.
+
+### Two detector bugs the restructured ledger exposed
+
+1. **`rare_account_pair` looked up pairings in either direction.** Dr Sundry
+   Creditors / Cr Bank is how every vendor payment is written; the reverse is a
+   supplier refund and is genuinely rare. Taking the rarer direction flagged
+   ordinary payments as unusual pairings — 18% of the ledger. Pairings are now
+   directional.
+2. **`unusual_preparer_account` was unreachable on small accounts.** Five percent
+   of a thirteen-entry account is 0.65, so even a single entry failed the test.
+   A floor of one entry was added: one entry on an account owned by someone else
+   is exactly the case the signal exists for.
 
 ## Abstention
 

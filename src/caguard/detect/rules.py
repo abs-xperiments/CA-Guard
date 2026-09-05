@@ -251,7 +251,8 @@ def detect_rare_account_pair(ctx: LedgerContext, cfg: DetectorConfig) -> list[Si
         pairs = [
             (pair, count)
             for pair, count in (
-                (p, ctx.pair_counts.get(p, 0)) for p in _pairs_within(row.accounts, ctx)
+                (p, ctx.pair_counts.get(p, 0))
+                for p in _pairs_within(row.debit_accounts, row.credit_accounts)
             )
             if 0 < count <= ceiling
         ]
@@ -384,9 +385,12 @@ def detect_unusual_preparer_account(ctx: LedgerContext, cfg: DetectorConfig) -> 
             and owner_share.get(account, ("", 0.0))[1] >= cfg.dominant_owner_min_share
             and owner_share[account][0] != person
             and ctx.preparer_account_counts.get((person, account), 0)
-            <= min(
-                cfg.unfamiliar_preparer_max_entries,
-                cfg.unfamiliar_preparer_max_share * account_totals[account],
+            <= max(
+                1,
+                min(
+                    cfg.unfamiliar_preparer_max_entries,
+                    cfg.unfamiliar_preparer_max_share * account_totals[account],
+                ),
             )
         ]
         if not unfamiliar:
@@ -454,9 +458,15 @@ def detect_post_close_entry(ctx: LedgerContext, cfg: DetectorConfig) -> list[Sig
     return hits
 
 
-def _pairs_within(accounts: frozenset[str], ctx: LedgerContext) -> list[tuple[str, str]]:
-    """Account pairings recorded for this voucher's accounts."""
-    return [pair for pair in ctx.pair_counts if pair[0] in accounts and pair[1] in accounts]
+def _pairs_within(debited: frozenset[str], credited: frozenset[str]) -> list[tuple[str, str]]:
+    """The pairings this voucher actually makes, in the direction it makes them.
+
+    Direction matters. Dr Sundry Creditors / Cr Bank is how every vendor payment
+    is written; the reverse is a refund from a supplier and is genuinely rare.
+    Looking up both directions and taking the rarer one flagged ordinary
+    payments as unusual pairings — 18% of the ledger.
+    """
+    return [(d, c) for d in sorted(debited) for c in sorted(credited)]
 
 
 def _would_flag_most_of_the_ledger(ctx: LedgerContext, ceiling: int, cfg: DetectorConfig) -> bool:

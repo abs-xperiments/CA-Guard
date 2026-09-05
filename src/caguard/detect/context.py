@@ -29,6 +29,8 @@ VOUCHER_COLUMNS = (
     "posted_at",
     "amount_paise",
     "accounts",
+    "debit_accounts",
+    "credit_accounts",
     "account_names",
     "document_ref",
     "evidence_lines",
@@ -89,18 +91,39 @@ def build_context(lines: pd.DataFrame) -> LedgerContext:
             "posted_at": grouped.posted_at.first(),
             "amount_paise": grouped.debit_paise.sum(),
             "accounts": grouped.account_code.agg(frozenset),
+            # Kept separately because a pairing has a direction. Dr Creditors /
+            # Cr Bank is an ordinary vendor payment; the reverse is a refund and is
+            # rare — conflating them made every payment look like a rare pairing.
+            "debit_accounts": frame[frame.debit_paise > 0]
+            .groupby("voucher_id")
+            .account_code.agg(frozenset),
+            "credit_accounts": frame[frame.credit_paise > 0]
+            .groupby("voucher_id")
+            .account_code.agg(frozenset),
             "account_names": grouped.account_name.agg(lambda s: sorted(set(s))),
-            "document_ref": grouped.document_ref.agg(_first_present),
+            "document_ref": grouped.document_ref.first(),
             "evidence_lines": grouped.document_ref.agg(lambda s: int(s.notna().sum())),
             "line_count": grouped.line_number.count(),
-            "approved_by": grouped.approved_by.agg(_first_present),
+            "approved_by": grouped.approved_by.first(),
             "created_by": grouped.created_by.first(),
             "is_manual": grouped.is_manual.max(),
             "is_post_close": grouped.is_post_close.max(),
             "voucher_type": grouped.voucher_type.first(),
-            "narration": grouped.narration.agg(_first_present),
+            "narration": grouped.narration.first(),
         }
     )
+    empty = frozenset[str]()
+    vouchers["debit_accounts"] = vouchers.debit_accounts.map(
+        lambda s: s if isinstance(s, frozenset) else empty
+    )
+    vouchers["credit_accounts"] = vouchers.credit_accounts.map(
+        lambda s: s if isinstance(s, frozenset) else empty
+    )
+    # Element-wise union. ``|`` on an object Series is logical OR in pandas,
+    # which silently yields booleans instead of sets.
+    vouchers["accounts"] = [
+        d | c for d, c in zip(vouchers.debit_accounts, vouchers.credit_accounts, strict=True)
+    ]
     vouchers["time_fidelity"] = _dominant_fidelity(frame).value
 
     return LedgerContext(
@@ -113,10 +136,10 @@ def build_context(lines: pd.DataFrame) -> LedgerContext:
     )
 
 
-def _first_present(series: pd.Series) -> object | None:
-    """The first non-null value, or None. Vouchers often carry the reference once."""
-    present = series.dropna()
-    return present.iloc[0] if len(present) else None
+def _sides(frame: pd.DataFrame, column: str) -> pd.Series:
+    """Accounts appearing on one side of each voucher."""
+    side = frame.loc[frame[column] > 0, ["voucher_id", "account_code"]]
+    return side.groupby("voucher_id").account_code.agg(frozenset)
 
 
 def _dominant_fidelity(frame: pd.DataFrame) -> TimeFidelity:
@@ -135,13 +158,18 @@ def _dominant_fidelity(frame: pd.DataFrame) -> TimeFidelity:
 
 
 def _count_pairs(frame: pd.DataFrame) -> Counter[tuple[str, str]]:
-    """How often each debit/credit account pairing occurs across the ledger."""
-    counts: Counter[tuple[str, str]] = Counter()
-    for _, group in frame.groupby("voucher_id", sort=False):
-        debited = sorted(set(group.loc[group.debit_paise > 0, "account_code"]))
-        credited = sorted(set(group.loc[group.credit_paise > 0, "account_code"]))
-        counts.update((d, c) for d in debited for c in credited)
-    return counts
+    """How often each debit/credit account pairing occurs across the ledger.
+
+    Done as a self-join rather than a loop over vouchers: the loop cost 48
+    seconds on a 53,000-voucher corpus, which is well inside the size of a real
+    client ledger.
+    """
+    debited = frame.loc[frame.debit_paise > 0, ["voucher_id", "account_code"]]
+    credited = frame.loc[frame.credit_paise > 0, ["voucher_id", "account_code"]]
+    joined = debited.drop_duplicates().merge(
+        credited.drop_duplicates(), on="voucher_id", suffixes=("_dr", "_cr")
+    )
+    return Counter(zip(joined.account_code_dr, joined.account_code_cr, strict=True))
 
 
 def _count_account_amounts(frame: pd.DataFrame) -> Counter[tuple[str, int]]:

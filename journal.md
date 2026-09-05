@@ -162,3 +162,54 @@ The signals also physically cannot see the answer key. A test walks the code and
 **Still open:** the CA review pack from Phase 1 (`docs/ca_validation/`). It remains the only outside check on whether this data resembles a real Indian ledger, and three of the four bugs above were realism faults that a practitioner would have spotted faster than I did. Not blocking.
 
 **Next step:** Phase 3 — the statistical and machine-learning layer (Benford's law, deviation from account norms, an Isolation Forest), measured against the same two baselines so we can say honestly whether it adds anything the rules did not already catch.
+
+---
+
+## 2026-09-06 05:40 IST — [AUDIT] I reviewed the generated ledger as a CA would, and it failed.
+
+**What happened:**
+You asked for an independent audit before moving on. I did one — and I should be clear at the outset that **I am not a practising Chartered Accountant**. What I did was apply Indian accounting and audit knowledge rigorously to our own generated data. It found real, serious problems. It does not replace the external review sitting in `docs/ca_validation/`, which is still worth getting.
+
+I started where any reviewer starts: I built a trial balance and read it.
+
+**It failed at the second line.** The bank account was overdrawn by ₹5.58 crore, with no overdraft facility anywhere in the books. That is not an unusual balance; it is an impossible one.
+
+It got worse from there:
+- **No opening balances at all.** The company apparently came into existence on 1 April with nothing and immediately traded ₹13 crore.
+- **Plant & Machinery showed a credit balance** of ₹66.75 lakh — a fixed asset appearing as a liability, because depreciation was charged straight against the asset with no opening cost.
+- **A full year of unpaid statutory dues:** ₹1.13 crore of TDS, ₹2.32 crore of GST, ₹89 lakh of PF, ₹10.24 crore of unpaid salaries. In a real engagement, unremitted TDS of ₹1.13 crore is a reportable matter. Here it turned out the payments simply did not exist.
+- **The term loan had been over-repaid** into a debit balance.
+- **258 days of debtors** — because collections were generated independently of the sales that created them.
+- **PF was computed on gross pay** rather than on basic capped at ₹15,000.
+
+**Why the earlier tests did not catch any of it.** Every one of these is invisible when you check vouchers one at a time, and that is all the Phase 1 tests did. Each voucher balanced perfectly. The ledger as a whole was nonsense. This is a lesson worth keeping: correctness at the level of a record tells you nothing about coherence at the level of a book.
+
+**What I changed:**
+The generator was rebuilt around a ledger rather than a stream of vouchers. It now opens from a real position (share capital, bank, debtors, creditors, fixed assets, a term loan). A sale creates a receivable that is later collected; a purchase creates a payable that is later paid. Statutory dues are remitted monthly — TDS by the 7th, PF by the 15th, GST by the 20th — computed from what the ledger actually accrued rather than invented, with March left outstanding because it genuinely falls due in April. Depreciation accumulates in its own account, monthly, as Schedule II expects.
+
+**Three more bugs surfaced while fixing those:**
+1. Payroll was being drawn at random instead of monthly — about **280 payroll runs in one year**, and ₹39 crore of wages against ₹8 crore of sales.
+2. Purchases were drawn from the same distribution as sales, leaving an **8% gross margin**. A trading company at 8% is losing money, and the overdrawn bank was simply the symptom.
+3. The petty-cash float could go **negative** on some seeds. Balancing withdrawals against payments works on average, not on every run, so the float is now tracked explicitly and cash payments stay under the ₹10,000 disallowance threshold.
+
+**And two bugs in the detectors, which only the more realistic ledger could expose:**
+1. **The "unusual account combination" signal looked up pairings in either direction.** Dr Creditors / Cr Bank is how every vendor payment is written; the reverse is a supplier refund and is genuinely rare. Taking the rarer of the two flagged **18% of the ledger** as unusual. Pairings now have a direction.
+2. **The "posted by someone outside their area" signal was unreachable on small accounts** — 5% of a thirteen-entry account is 0.65, so even a single entry failed the test. One entry on an account clearly owned by somebody else is exactly the case the signal exists for.
+
+**A performance problem too.** Preparing a ledger for analysis took 48 seconds for 53,000 vouchers, because it looped over every voucher in Python. That is well inside the size of a real client file. Rewritten as a database-style join: **8.8 seconds**, about five and a half times faster.
+
+**Trial balance now:** bank ₹2.96 crore in hand, cash ₹31,300, debtors ₹3.25 crore, creditors ₹2.31 crore, fixed assets at cost with depreciation accumulated separately, term loan a liability, and one month each of salaries, TDS, GST and PF outstanding — which is what a real 31 March closing looks like. Turnover ₹9.90 crore at a 34% gross margin, 120 debtor days, 129 creditor days. Trial balance nets to zero.
+
+**Tests/checks:** ruff clean, pyright 0 errors, **270 tests passing** plus the two full-corpus tests. The audit itself is now 22 regression tests in `tests/test_ledger_coherence.py` that read the trial balance, so this class of defect cannot come back unnoticed. Detector quality was re-measured on the held-out seeds after the restructure: nine signals at 100% recall, `unusual_preparer_account` at 90%, **zero decoys wrongly queued out of 1,000**, queue 5.9%.
+
+**Git commit:** see below.
+
+**Founder decision needed:** none.
+
+**Credentials needed:** none. Still ₹0.
+
+**Left undone deliberately:** TDS threshold limits, a round-off account, Professional Tax / ESI / IGST / export sales, and GST on bank charges. These affect presentation rather than the shape of the population, and are recorded in the findings document. The company also runs at an indicative loss — unusual, but not implausible, and not an audit red flag in itself.
+
+**The external CA review is still open.** Everything above came from an internal review. A practitioner will still see things I did not, and three of the bugs I found were realism faults a practitioner would have spotted faster.
+
+**Next step:** Phase 3 — statistical and machine-learning detection.

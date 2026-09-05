@@ -87,10 +87,10 @@ def _saturday(b: _Builder) -> int:
 
 def _year_end_accrual(b: _Builder) -> int:
     """Depreciation and provisions legitimately belong on 31 March."""
-    amount = b.amount_paise(mu=12.4)
+    amount = b.amount_paise(mu=11.6)
     is_depreciation = b.rng.random() < 0.5
     legs = (
-        [("5920", amount, 0), ("1500", 0, amount)]
+        [("5920", amount, 0), ("1590", 0, amount)]
         if is_depreciation
         else [("5210", amount, 0), ("2400", 0, amount)]
     )

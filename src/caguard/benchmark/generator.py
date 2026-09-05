@@ -35,7 +35,9 @@ from caguard.schema import (
     fiscal_year_of,
 )
 
-GENERATOR_VERSION = "1.0.0"
+GENERATOR_VERSION = "2.0.0"
+
+MONTHS_IN_YEAR = 12
 
 #: One leg of a voucher: account code, debit paise, credit paise.
 Leg = tuple[str, int, int]
@@ -48,6 +50,11 @@ class GeneratorConfig:
     ``anomaly_rate`` defaults to 2%, inside the 1–3% band ADR-0003 rule 3
     requires. A convenient 20% would make every metric look better and mean
     nothing, because a real ledger does not contain 20% irregularities.
+
+    ``n_vouchers`` is a target for the business population, not an exact count.
+    An invoice and its settlement are one event and two vouchers, and the
+    statutory remittances that follow depend on what the year actually accrued,
+    so the ledger lands a little above the figure asked for.
     """
 
     seed: int = 20250906
@@ -127,6 +134,10 @@ class _Builder:
         self.truth: list[VoucherTruth] = []
         self._seq = 0
         self._occurrences: dict[str, int] = {}
+        #: Running petty-cash balance. Cash cannot go negative, so withdrawals
+        #: and cash payments have to be driven by what is actually in the tin
+        #: rather than by a weighting that only balances on average.
+        self.cash_paise = 0
 
     def occurrence(self, kind: str) -> int:
         """How many times this pattern has been emitted so far, 0-based.
@@ -316,8 +327,15 @@ class _Builder:
         return [(code, gross, 0), (tds_account, 0, tds), ("1010", 0, gross - tds)]
 
     def salary_legs(self, gross: int) -> list[Leg]:
+        """Payroll: gross wages, less TDS under section 192 and provident fund.
+
+        PF is applied per employee against the ₹15,000 basic ceiling, not to the
+        aggregate. Twelve percent of a whole payroll figure overstates the
+        liability by a wide margin once salaries rise above that ceiling.
+        """
         tds = gross * coa.TDS_192_PCT // 100
-        pf = gross * coa.PF_PCT // 100
+        basic_each = int(gross * coa.BASIC_SHARE_OF_GROSS) // coa.EMPLOYEE_COUNT
+        pf = coa.EMPLOYEE_COUNT * (min(basic_each, coa.PF_CEILING_BASIC_PAISE) * coa.PF_PCT // 100)
         return [
             ("5100", gross, 0),
             ("2202", 0, tds),
@@ -398,8 +416,15 @@ def generate(config: GeneratorConfig | None = None) -> GeneratedLedger:
     distributed round-robin so that every kind appears in every run, which is
     what makes per-type recall reportable (ADR-0003 rule 5).
     """
-    # Imported here, not at module scope: patterns and decoys both need _Builder
-    # from this module, so a top-level import would be circular.
+    # Imported here, not at module scope: these modules all need _Builder from
+    # this one, so a top-level import would be circular.
+    from caguard.benchmark.cycles import (
+        emit_depreciation,
+        emit_opening_balances,
+        emit_opening_settlements,
+        emit_payroll,
+        emit_statutory_settlements,
+    )
     from caguard.benchmark.decoys import emit_decoy
     from caguard.benchmark.patterns import emit_anomaly, emit_normal
 
@@ -409,13 +434,25 @@ def generate(config: GeneratorConfig | None = None) -> GeneratedLedger:
     target_anomalous = max(len(AnomalyKind), round(cfg.n_vouchers * cfg.anomaly_rate))
     target_decoys = max(len(DecoyKind), round(cfg.n_vouchers * cfg.decoy_rate))
 
-    emitted = 0
+    # The year opens from a position, not from nothing.
+    emitted = emit_opening_balances(b)
+    emitted += emit_opening_settlements(b)
+    # Payroll and depreciation happen once a month, like the calendar says.
+    for month in range(MONTHS_IN_YEAR):
+        emitted += emit_depreciation(b, month)
+        emitted += emit_payroll(b, month)
+        emitted += emit_payroll(b, month, directors=True)
+
     for i in range(target_anomalous):
         emitted += emit_anomaly(b, list(AnomalyKind)[i % len(AnomalyKind)])
     for kind in _decoy_schedule(target_decoys):
         emitted += emit_decoy(b, kind)
     while emitted < cfg.n_vouchers:
         emitted += emit_normal(b)
+
+    # Last, because it reads what everything else accrued: the month's TDS, PF
+    # and net GST are discharged in the following month rather than invented.
+    emitted += emit_statutory_settlements(b)
 
     truth_records = _reassign_ids(b.rows, b.truth)
     frame = pd.DataFrame(b.rows, columns=list(COLUMNS)).sort_values(

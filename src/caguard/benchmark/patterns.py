@@ -12,7 +12,7 @@ so that all randomness flows from the single seeded generator.
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
 from caguard.benchmark import coa
 from caguard.benchmark.anomalies import AnomalyKind
@@ -20,140 +20,47 @@ from caguard.benchmark.generator import Leg, _Builder
 from caguard.schema import VoucherType
 
 # --- ordinary business -------------------------------------------------------
+# The trading cycles, payroll and statutory remittances live in
+# :mod:`caguard.benchmark.cycles`. They were moved out when an internal review
+# found the generator was producing vouchers rather than books; keeping them
+# separate makes the distinction visible.
 
+# Payroll and depreciation are emitted once a month by the generator, not drawn
+# from here. Salary is a monthly run; drawing it at random produced roughly 280
+# payroll runs in a single year and ₹39 crore of wages against ₹8 crore of sales.
 _NORMAL_MIX: tuple[tuple[str, int], ...] = (
-    ("sales", 28),
-    ("purchase", 24),
-    ("receipt", 14),
-    ("pay_vendor", 12),
-    ("pay_expense", 10),
-    ("salary", 5),
-    ("director_pay", 4),
-    ("contra", 3),
+    ("sales", 34),
+    ("purchase", 30),
+    ("expense", 12),
+    ("cash", 16),
 )
 _KINDS = [k for k, _ in _NORMAL_MIX]
 _WEIGHTS = [w for _, w in _NORMAL_MIX]
 
-# Ordinary expenses and the TDS section that applies to each.
-_EXPENSE_MIX: tuple[tuple[str, int, str], ...] = (
-    ("5500", coa.TDS_194J_PCT, "2201"),  # professional fees
-    ("5300", coa.TDS_194C_PCT, "2200"),  # freight
-    ("5400", coa.TDS_194C_PCT, "2200"),  # repairs
-    ("5700", coa.TDS_194C_PCT, "2200"),  # advertisement
-)
-
 
 def emit_normal(b: _Builder) -> int:
-    """One ordinary, well-documented voucher. Returns vouchers added."""
-    kind = b.rng.choices(_KINDS, weights=_WEIGHTS)[0]
-    day = b.working_day()
-    posted = b.business_time(day)
-    amount = b.amount_paise()
+    """One ordinary business event. Returns the number of vouchers it produced.
 
-    if kind == "sales":
-        customer = b.rng.choice(coa.CUSTOMERS)
-        b.add(
-            voucher_type=VoucherType.SALES,
-            voucher_date=day,
-            posted_at=posted,
-            legs=b.sales_legs(amount),
-            narration=f"Sales to {customer}",
-            document_ref=b.doc_ref("INV"),
-            approved_by=_approver(b, amount),
-        )
-    elif kind == "purchase":
-        vendor = b.rng.choice(coa.VENDORS)
-        b.add(
-            voucher_type=VoucherType.PURCHASE,
-            voucher_date=day,
-            posted_at=posted,
-            legs=b.purchase_legs(amount),
-            narration=f"Purchase from {vendor}",
-            document_ref=b.doc_ref("PINV"),
-            approved_by=_approver(b, amount),
-        )
-    elif kind == "receipt":
-        customer = b.rng.choice(coa.CUSTOMERS)
-        b.add(
-            voucher_type=VoucherType.RECEIPT,
-            voucher_date=day,
-            posted_at=posted,
-            legs=[("1010", amount, 0), ("1100", 0, amount)],
-            narration=f"Receipt from {customer} against invoice",
-            document_ref=b.doc_ref("RCPT"),
-        )
-    elif kind == "pay_vendor":
-        vendor = b.rng.choice(coa.VENDORS)
-        b.add(
-            voucher_type=VoucherType.PAYMENT,
-            voucher_date=day,
-            posted_at=posted,
-            legs=[("2000", amount, 0), ("1010", 0, amount)],
-            narration=f"Payment to {vendor}",
-            document_ref=b.doc_ref("BP"),
-            approved_by=_approver(b, amount),
-        )
-    elif kind == "pay_expense":
-        code, tds_pct, tds_acct = b.rng.choice(_EXPENSE_MIX)
-        b.add(
-            voucher_type=VoucherType.PAYMENT,
-            voucher_date=day,
-            posted_at=posted,
-            legs=b.expense_legs(code, amount, tds_pct, tds_acct),
-            narration=f"{coa.account(code).name} paid, TDS deducted",
-            document_ref=b.doc_ref("BP"),
-            approved_by=_approver(b, amount),
-        )
-    elif kind == "salary":
-        month_end = _month_end(day)
-        b.add(
-            voucher_type=VoucherType.JOURNAL,
-            voucher_date=month_end,
-            posted_at=b.business_time(month_end, lag_days=1),
-            legs=b.salary_legs(amount * 4),
-            narration="Salary payable for the month",
-            document_ref=b.doc_ref("PAY"),
-            approved_by=b.rng.choice(coa.APPROVERS),
-            is_manual=True,
-        )
-    elif kind == "director_pay":
-        # Directors are paid every month, by payroll. Without this the ledger has
-        # no legitimate baseline on Director Remuneration, so "posted by someone
-        # outside their normal area" has nothing to be unusual against.
-        month_end = _month_end(day)
-        gross = amount * 3
-        tds = gross * coa.TDS_192_PCT // 100
-        b.add(
-            voucher_type=VoucherType.JOURNAL,
-            voucher_date=month_end,
-            posted_at=b.business_time(month_end, lag_days=1),
-            legs=[("5110", gross, 0), ("2202", 0, tds), ("2300", 0, gross - tds)],
-            narration="Director remuneration for the month, TDS deducted",
-            document_ref=b.doc_ref("PAY"),
-            approved_by=b.rng.choice(coa.APPROVERS),
-            created_by="avarma",
-            is_manual=True,
-        )
-    else:  # contra
-        b.add(
-            voucher_type=VoucherType.CONTRA,
-            voucher_date=day,
-            posted_at=posted,
-            legs=[("1000", amount, 0), ("1010", 0, amount)],
-            narration="Cash withdrawn from bank for office use",
-            document_ref=b.doc_ref("CTR"),
-        )
-    return 1
+    A sale or a purchase usually produces two vouchers, because the invoice and
+    its settlement are the same event seen twice.
+    """
+    from caguard.benchmark import cycles
+
+    kind = b.rng.choices(_KINDS, weights=_WEIGHTS)[0]
+    match kind:
+        case "sales":
+            return cycles.emit_sales_cycle(b)
+        case "purchase":
+            return cycles.emit_purchase_cycle(b)
+        case "expense":
+            return cycles.emit_expense_payment(b)
+        case _:
+            return cycles.emit_cash_activity(b)
 
 
 def _approver(b: _Builder, amount: int) -> str | None:
     """Entries above the delegation limit are approved; smaller ones need not be."""
     return b.rng.choice(coa.APPROVERS) if amount >= coa.APPROVAL_LIMIT_PAISE else None
-
-
-def _month_end(day: date) -> date:
-    nxt = date(day.year + (day.month == 12), day.month % 12 + 1, 1)
-    return nxt - timedelta(days=1)
 
 
 # --- planted irregularities --------------------------------------------------
@@ -217,10 +124,22 @@ def _duplicate_payment(b: _Builder) -> int:
     return 2
 
 
+#: Round figures a manufactured provision might use, and the accounts whose
+#: values are otherwise irregular.
+_ROUND_FIGURES: tuple[int, ...] = (2, 3, 5, 7, 10, 15, 20, 25)
+_ROUND_ACCOUNTS: tuple[str, ...] = ("5900", "5500", "5600")
+
+
 def _round_amount(b: _Builder) -> int:
     """A large, exactly round figure in an account whose values are normally irregular."""
-    amount = b.rng.choice([2, 3, 5, 7, 10, 15]) * 100_000_00  # ₹2,00,000 … ₹15,00,000
-    code = b.rng.choice(["5900", "5500", "5600"])
+    # Varied deterministically so no (account, amount) pair repeats. Planting
+    # ₹2,00,000 on Professional Fees three times turns it into a retainer, and a
+    # detector that ignored it would be right to.
+    figure = _ROUND_FIGURES[b.occurrence("round") % len(_ROUND_FIGURES)]
+    code = _ROUND_ACCOUNTS[
+        (b.occurrence("round_account") // len(_ROUND_FIGURES)) % len(_ROUND_ACCOUNTS)
+    ]
+    amount = figure * 100_000_00
     day = b.working_day()
     b.add(
         voucher_type=VoucherType.JOURNAL,
@@ -382,7 +301,6 @@ _OFF_PATCH_TARGETS: tuple[tuple[str, str], ...] = (
     ("5000", "Purchase adjustment posted"),
     ("5100", "Wages settled"),
     ("5500", "Consultant paid"),
-    ("2000", "Creditor balance settled"),
 )
 
 

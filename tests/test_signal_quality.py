@@ -50,7 +50,11 @@ TRAP: dict[SignalKind, DecoyKind] = {
 #: observed minimum on purpose.
 RECALL_FLOOR: dict[SignalKind, float] = dict.fromkeys(RESPONSIBILITY, 1.0) | {
     SignalKind.RARE_ACCOUNT_PAIR: 0.75,
-    SignalKind.UNUSUAL_PREPARER_ACCOUNT: 0.75,
+    # Observed 90% mean / 75% worst seed. The floor sits below that on purpose:
+    # this signal needs the account to have a clear regular owner, and not every
+    # account in a real ledger does. A floor pinned to the observed minimum would
+    # be a floor tuned to this benchmark, and would break on the next seed.
+    SignalKind.UNUSUAL_PREPARER_ACCOUNT: 0.60,
 }
 
 #: Seeds never used while developing the thresholds (ADR-0003 rule 4, ADR-0004).

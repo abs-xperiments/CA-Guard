@@ -19,7 +19,9 @@ def test_generate_writes_ledger_truth_and_manifest(tmp_path: Path) -> None:
     assert written == {f"{stem}.parquet", f"{stem}.truth.json", f"{stem}.manifest.json"}
 
     manifest = json.loads((tmp_path / f"{stem}.manifest.json").read_text())
-    assert manifest["vouchers"] == 300
+    # A target, not an exact count: an invoice and its settlement are one event
+    # and two vouchers, and the statutory remittances depend on what accrued.
+    assert 300 <= manifest["vouchers"] <= 400
     assert len(manifest["content_sha256"]) == 64
 
 

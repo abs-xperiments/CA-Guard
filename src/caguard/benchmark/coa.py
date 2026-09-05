@@ -36,6 +36,10 @@ ACCOUNTS: tuple[Account, ...] = (
     Account("1301", "GST Input Credit - SGST", AccountGroup.ASSET),
     Account("1400", "Advance to Suppliers", AccountGroup.ASSET),
     Account("1500", "Plant & Machinery", AccountGroup.ASSET),
+    # Contra-asset. Schedule II of the Companies Act expects depreciation to
+    # accumulate here so gross block, depreciation and net block stay visible —
+    # crediting the asset directly hides all three.
+    Account("1590", "Accumulated Depreciation", AccountGroup.ASSET),
     Account("1520", "Computers", AccountGroup.ASSET),
     Account("1600", "Prepaid Expenses", AccountGroup.ASSET),
     # A suspense account is where unexplained entries go to be forgotten; it is a
@@ -131,6 +135,14 @@ TDS_194J_PCT = 10  # professional fees
 TDS_194C_PCT = 2  # contractors
 TDS_192_PCT = 8  # salary, approximated as an average slab deduction
 PF_PCT = 12
+#: Provident fund is 12% of *basic*, and basic is capped at ₹15,000 for the
+#: statutory contribution — ₹1,800 per employee per month. Applying 12% to the
+#: whole payroll figure overstates the liability materially.
+PF_CEILING_BASIC_PAISE = 15_000_00
+BASIC_SHARE_OF_GROSS = 0.5
+#: Headcount behind a monthly payroll voucher, so the PF ceiling can be applied
+#: per employee rather than to the aggregate.
+EMPLOYEE_COUNT = 45
 
 # Delegation-of-authority limit. Entries just under it are what the
 # threshold-adjacency signal looks for in Phase 2.
