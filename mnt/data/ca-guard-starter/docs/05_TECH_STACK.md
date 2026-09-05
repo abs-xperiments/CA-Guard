@@ -3,6 +3,19 @@
 ## Principle
 Use a simple, free, widely supported stack that Claude Code can build quickly and students can maintain.
 
+> **Frozen 2026-09-06 (Phase 0, ADR-0002).** Verified by actually installing and importing the stack, not by reading metadata. Binding hardware constraint discovered: **8 GB unified memory, arm64** — this caps the local model at 3–4B, not 7B.
+>
+> | Layer | Frozen choice |
+> |---|---|
+> | Frontend | Next.js **16.3.4** (Active LTS to 2027-10-22), TypeScript, Tailwind v4, shadcn/ui (MIT, vendored) |
+> | Backend | Python **3.13** (3.14.3 verified as fallback), FastAPI 0.141.1, Pydantic 2.13.5 |
+> | Dataframes | **pandas 3.0.5 — Polars rejected.** 34 MB / 667k rows does not justify a second engine. |
+> | ML | scikit-learn 1.9.0 (Isolation Forest) |
+> | Storage | SQLite for local/private; Postgres only if the demo requires it |
+> | Local LLM | Ollama + a **3–4B** instruct model (Qwen3.5-4B / Phi-4-mini / Gemma-4-E4B) — **not 7B** |
+>
+> **Railway cost reality:** the $0 Free plan is 1 vCPU / **0.5 GB RAM** / 1 replica with $1 monthly credit — it **cannot** host this stack. A working public demo needs **Hobby at $5/month**. Neon's free tier (0.5 GB, 100 CU-hours, 5-min auto-suspend) is permanent and adequate if ever needed, but the private path must not depend on it.
+
 ## Proposed stack
 
 ### Frontend
