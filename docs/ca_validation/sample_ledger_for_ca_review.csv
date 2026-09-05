@@ -1,0 +1,201 @@
+Voucher No,Date,Posted,Vch Type,Ledger,Debit,Credit,Narration,Doc Ref,Entered By,Approved By
+V000001,01-04-2024,01-04-2024 11:50,Purchase,Purchases - Raw Material,"₹56,586.15",,Purchase from Nova Industrial Spares,PINV/24-25/2218,skulkarni,menon.fc
+V000001,01-04-2024,01-04-2024 11:50,Purchase,GST Input Credit - CGST,"₹5,092.75",,Purchase from Nova Industrial Spares,PINV/24-25/2218,skulkarni,menon.fc
+V000001,01-04-2024,01-04-2024 11:50,Purchase,GST Input Credit - SGST,"₹5,092.75",,Purchase from Nova Industrial Spares,PINV/24-25/2218,skulkarni,menon.fc
+V000001,01-04-2024,01-04-2024 11:50,Purchase,Sundry Creditors,,"₹66,771.65",Purchase from Nova Industrial Spares,PINV/24-25/2218,skulkarni,menon.fc
+V000002,01-04-2024,01-04-2024 12:45,Payment,Term Loan - HDFC Bank,"₹2,00,000.00",,Term loan EMI debited by HDFC Bank,EMI/24-25/0134,pnair,iyer.cfo
+V000002,01-04-2024,01-04-2024 12:45,Payment,Interest on Term Loan,"₹47,318.00",,Term loan EMI debited by HDFC Bank,EMI/24-25/0134,pnair,iyer.cfo
+V000002,01-04-2024,01-04-2024 12:45,Payment,HDFC Bank - Current A/c,,"₹2,47,318.00",Term loan EMI debited by HDFC Bank,EMI/24-25/0134,pnair,iyer.cfo
+V000003,01-04-2024,01-04-2024 13:29,Purchase,Purchases - Raw Material,"₹71,635.25",,Purchase from Ganesh Engineering Works,PINV/24-25/2120,skulkarni,menon.fc
+V000003,01-04-2024,01-04-2024 13:29,Purchase,GST Input Credit - CGST,"₹6,447.17",,Purchase from Ganesh Engineering Works,PINV/24-25/2120,skulkarni,menon.fc
+V000003,01-04-2024,01-04-2024 13:29,Purchase,GST Input Credit - SGST,"₹6,447.17",,Purchase from Ganesh Engineering Works,PINV/24-25/2120,skulkarni,menon.fc
+V000003,01-04-2024,01-04-2024 13:29,Purchase,Sundry Creditors,,"₹84,529.59",Purchase from Ganesh Engineering Works,PINV/24-25/2120,skulkarni,menon.fc
+V000004,01-04-2024,01-04-2024 18:04,Payment,Sundry Creditors,"₹1,06,532.32",,Payment to Meridian Office Supplies,BP/24-25/1490,pnair,menon.fc
+V000004,01-04-2024,01-04-2024 18:04,Payment,HDFC Bank - Current A/c,,"₹1,06,532.32",Payment to Meridian Office Supplies,BP/24-25/1490,pnair,menon.fc
+V000005,01-04-2024,01-04-2024 18:58,Payment,Rent,"₹2,00,000.00",,Office rent for the month as per lease agreement,RENT/24-25/5631,dshah,menon.fc
+V000005,01-04-2024,01-04-2024 18:58,Payment,HDFC Bank - Current A/c,,"₹2,00,000.00",Office rent for the month as per lease agreement,RENT/24-25/5631,dshah,menon.fc
+V000006,01-04-2024,02-04-2024 18:48,Sales,Sundry Debtors,"₹1,62,926.97",,Sales to Rajdhani Marketing,INV/24-25/6274,rmehta,bose.mgr
+V000006,01-04-2024,02-04-2024 18:48,Sales,Sales - Domestic,,"₹1,38,073.71",Sales to Rajdhani Marketing,INV/24-25/6274,rmehta,bose.mgr
+V000006,01-04-2024,02-04-2024 18:48,Sales,GST Payable - CGST,,"₹12,426.63",Sales to Rajdhani Marketing,INV/24-25/6274,rmehta,bose.mgr
+V000006,01-04-2024,02-04-2024 18:48,Sales,GST Payable - SGST,,"₹12,426.63",Sales to Rajdhani Marketing,INV/24-25/6274,rmehta,bose.mgr
+V000007,01-04-2024,04-04-2024 10:30,Sales,Sundry Debtors,"₹1,30,782.77",,Sales to Trident Manufacturing Co,INV/24-25/9911,rmehta,bose.mgr
+V000007,01-04-2024,04-04-2024 10:30,Sales,Sales - Domestic,,"₹1,10,832.87",Sales to Trident Manufacturing Co,INV/24-25/9911,rmehta,bose.mgr
+V000007,01-04-2024,04-04-2024 10:30,Sales,GST Payable - CGST,,"₹9,974.95",Sales to Trident Manufacturing Co,INV/24-25/9911,rmehta,bose.mgr
+V000007,01-04-2024,04-04-2024 10:30,Sales,GST Payable - SGST,,"₹9,974.95",Sales to Trident Manufacturing Co,INV/24-25/9911,rmehta,bose.mgr
+V000008,01-04-2024,01-08-2024 14:23,Payment,Director Remuneration,"₹41,778.96",,Remuneration paid,BP/24-25/2478,rmehta,
+V000008,01-04-2024,01-08-2024 14:23,Payment,HDFC Bank - Current A/c,,"₹41,778.96",Remuneration paid,BP/24-25/2478,rmehta,
+V000009,02-04-2024,02-04-2024 10:47,Payment,Sundry Creditors,"₹1,22,607.93",,Payment to Ganesh Engineering Works,BP/24-25/2054,skulkarni,iyer.cfo
+V000009,02-04-2024,02-04-2024 10:47,Payment,HDFC Bank - Current A/c,,"₹1,22,607.93",Payment to Ganesh Engineering Works,BP/24-25/2054,skulkarni,iyer.cfo
+V000010,02-04-2024,02-04-2024 11:54,Sales,Sundry Debtors,"₹1,05,305.04",,Sales to Pinnacle Distributors,INV/24-25/7759,rmehta,menon.fc
+V000010,02-04-2024,02-04-2024 11:54,Sales,Sales - Domestic,,"₹89,241.56",Sales to Pinnacle Distributors,INV/24-25/7759,rmehta,menon.fc
+V000010,02-04-2024,02-04-2024 11:54,Sales,GST Payable - CGST,,"₹8,031.74",Sales to Pinnacle Distributors,INV/24-25/7759,rmehta,menon.fc
+V000010,02-04-2024,02-04-2024 11:54,Sales,GST Payable - SGST,,"₹8,031.74",Sales to Pinnacle Distributors,INV/24-25/7759,rmehta,menon.fc
+V000011,02-04-2024,02-04-2024 15:20,Receipt,HDFC Bank - Current A/c,"₹39,375.33",,Receipt from Pinnacle Distributors against invoice,RCPT/24-25/1074,pnair,
+V000011,02-04-2024,02-04-2024 15:20,Receipt,Sundry Debtors,,"₹39,375.33",Receipt from Pinnacle Distributors against invoice,RCPT/24-25/1074,pnair,
+V000012,02-04-2024,02-04-2024 16:30,Sales,Sundry Debtors,"₹24,200.67",,Sales to Vikram Auto Components Ltd,INV/24-25/8243,rmehta,
+V000012,02-04-2024,02-04-2024 16:30,Sales,Sales - Domestic,,"₹20,509.05",Sales to Vikram Auto Components Ltd,INV/24-25/8243,rmehta,
+V000012,02-04-2024,02-04-2024 16:30,Sales,GST Payable - CGST,,"₹1,845.81",Sales to Vikram Auto Components Ltd,INV/24-25/8243,rmehta,
+V000012,02-04-2024,02-04-2024 16:30,Sales,GST Payable - SGST,,"₹1,845.81",Sales to Vikram Auto Components Ltd,INV/24-25/8243,rmehta,
+V000013,02-04-2024,02-04-2024 16:36,Payment,Sundry Creditors,"₹49,995.73",,Part payment to Nova Industrial Spares,BP/24-25/5488,pnair,
+V000013,02-04-2024,02-04-2024 16:36,Payment,HDFC Bank - Current A/c,,"₹49,995.73",Part payment to Nova Industrial Spares,BP/24-25/5488,pnair,
+V000014,02-04-2024,02-04-2024 18:12,Receipt,HDFC Bank - Current A/c,"₹21,193.85",,Receipt from Pinnacle Distributors against invoice,RCPT/24-25/2822,rmehta,
+V000014,02-04-2024,02-04-2024 18:12,Receipt,Sundry Debtors,,"₹21,193.85",Receipt from Pinnacle Distributors against invoice,RCPT/24-25/2822,rmehta,
+V000015,02-04-2024,02-04-2024 18:20,Sales,Sundry Debtors,"₹1,55,400.85",,Sales to Trident Manufacturing Co,INV/24-25/6553,rmehta,menon.fc
+V000015,02-04-2024,02-04-2024 18:20,Sales,Sales - Domestic,,"₹1,31,695.65",Sales to Trident Manufacturing Co,INV/24-25/6553,rmehta,menon.fc
+V000015,02-04-2024,02-04-2024 18:20,Sales,GST Payable - CGST,,"₹11,852.60",Sales to Trident Manufacturing Co,INV/24-25/6553,rmehta,menon.fc
+V000015,02-04-2024,02-04-2024 18:20,Sales,GST Payable - SGST,,"₹11,852.60",Sales to Trident Manufacturing Co,INV/24-25/6553,rmehta,menon.fc
+V000016,02-04-2024,02-04-2024 18:38,Purchase,Purchases - Raw Material,"₹36,105.64",,Purchase from Deccan Power Solutions,PINV/24-25/4820,skulkarni,
+V000016,02-04-2024,02-04-2024 18:38,Purchase,GST Input Credit - CGST,"₹3,249.50",,Purchase from Deccan Power Solutions,PINV/24-25/4820,skulkarni,
+V000016,02-04-2024,02-04-2024 18:38,Purchase,GST Input Credit - SGST,"₹3,249.50",,Purchase from Deccan Power Solutions,PINV/24-25/4820,skulkarni,
+V000016,02-04-2024,02-04-2024 18:38,Purchase,Sundry Creditors,,"₹42,604.64",Purchase from Deccan Power Solutions,PINV/24-25/4820,skulkarni,
+V000017,02-04-2024,03-04-2024 10:23,Payment,Sundry Creditors,"₹49,960.70",,Part payment to Ganesh Engineering Works,BP/24-25/1187,skulkarni,
+V000017,02-04-2024,03-04-2024 10:23,Payment,HDFC Bank - Current A/c,,"₹49,960.70",Part payment to Ganesh Engineering Works,BP/24-25/1187,skulkarni,
+V000018,02-04-2024,04-04-2024 13:14,Purchase,Purchases - Raw Material,"₹23,992.06",,Purchase from Nova Industrial Spares,PINV/24-25/0805,skulkarni,
+V000018,02-04-2024,04-04-2024 13:14,Purchase,GST Input Credit - CGST,"₹2,159.28",,Purchase from Nova Industrial Spares,PINV/24-25/0805,skulkarni,
+V000018,02-04-2024,04-04-2024 13:14,Purchase,GST Input Credit - SGST,"₹2,159.28",,Purchase from Nova Industrial Spares,PINV/24-25/0805,skulkarni,
+V000018,02-04-2024,04-04-2024 13:14,Purchase,Sundry Creditors,,"₹28,310.62",Purchase from Nova Industrial Spares,PINV/24-25/0805,skulkarni,
+V000019,03-04-2024,03-04-2024 09:56,Payment,Repairs & Maintenance,"₹3,34,155.63",,"Repairs & Maintenance paid, TDS deducted",BP/24-25/8678,nreddy,menon.fc
+V000019,03-04-2024,03-04-2024 09:56,Payment,TDS Payable - 194C Contractors,,"₹6,683.11","Repairs & Maintenance paid, TDS deducted",BP/24-25/8678,nreddy,menon.fc
+V000019,03-04-2024,03-04-2024 09:56,Payment,HDFC Bank - Current A/c,,"₹3,27,472.52","Repairs & Maintenance paid, TDS deducted",BP/24-25/8678,nreddy,menon.fc
+V000020,03-04-2024,03-04-2024 13:45,Purchase,Purchases - Raw Material,"₹21,927.02",,Purchase from Kaveri Logistics,PINV/24-25/6108,skulkarni,
+V000020,03-04-2024,03-04-2024 13:45,Purchase,GST Input Credit - CGST,"₹1,973.43",,Purchase from Kaveri Logistics,PINV/24-25/6108,skulkarni,
+V000020,03-04-2024,03-04-2024 13:45,Purchase,GST Input Credit - SGST,"₹1,973.43",,Purchase from Kaveri Logistics,PINV/24-25/6108,skulkarni,
+V000020,03-04-2024,03-04-2024 13:45,Purchase,Sundry Creditors,,"₹25,873.88",Purchase from Kaveri Logistics,PINV/24-25/6108,skulkarni,
+V000021,03-04-2024,03-04-2024 14:28,Purchase,Purchases - Raw Material,"₹2,26,898.99",,Purchase from Nova Industrial Spares,PINV/24-25/2291,skulkarni,bose.mgr
+V000021,03-04-2024,03-04-2024 14:28,Purchase,GST Input Credit - CGST,"₹20,420.90",,Purchase from Nova Industrial Spares,PINV/24-25/2291,skulkarni,bose.mgr
+V000021,03-04-2024,03-04-2024 14:28,Purchase,GST Input Credit - SGST,"₹20,420.90",,Purchase from Nova Industrial Spares,PINV/24-25/2291,skulkarni,bose.mgr
+V000021,03-04-2024,03-04-2024 14:28,Purchase,Sundry Creditors,,"₹2,67,740.79",Purchase from Nova Industrial Spares,PINV/24-25/2291,skulkarni,bose.mgr
+V000022,03-04-2024,03-04-2024 14:52,Receipt,HDFC Bank - Current A/c,"₹1,99,722.06",,Receipt from Rajdhani Marketing against invoice,RCPT/24-25/3012,pnair,
+V000022,03-04-2024,03-04-2024 14:52,Receipt,Sundry Debtors,,"₹1,99,722.06",Receipt from Rajdhani Marketing against invoice,RCPT/24-25/3012,pnair,
+V000023,03-04-2024,03-04-2024 16:20,Sales,Sundry Debtors,"₹3,06,976.94",,Sales to Pinnacle Distributors,INV/24-25/4863,rmehta,bose.mgr
+V000023,03-04-2024,03-04-2024 16:20,Sales,Sales - Domestic,,"₹2,60,149.96",Sales to Pinnacle Distributors,INV/24-25/4863,rmehta,bose.mgr
+V000023,03-04-2024,03-04-2024 16:20,Sales,GST Payable - CGST,,"₹23,413.49",Sales to Pinnacle Distributors,INV/24-25/4863,rmehta,bose.mgr
+V000023,03-04-2024,03-04-2024 16:20,Sales,GST Payable - SGST,,"₹23,413.49",Sales to Pinnacle Distributors,INV/24-25/4863,rmehta,bose.mgr
+V000024,03-04-2024,03-04-2024 17:59,Payment,Professional Fees,"₹22,188.52",,"Professional Fees paid, TDS deducted",BP/24-25/9770,nreddy,
+V000024,03-04-2024,03-04-2024 17:59,Payment,TDS Payable - 194J Professional,,"₹2,218.85","Professional Fees paid, TDS deducted",BP/24-25/9770,nreddy,
+V000024,03-04-2024,03-04-2024 17:59,Payment,HDFC Bank - Current A/c,,"₹19,969.67","Professional Fees paid, TDS deducted",BP/24-25/9770,nreddy,
+V000025,03-04-2024,03-04-2024 18:42,Payment,Sundry Creditors,"₹14,88,852.74",,Payment to Kaveri Logistics,BP/24-25/4735,skulkarni,iyer.cfo
+V000025,03-04-2024,03-04-2024 18:42,Payment,HDFC Bank - Current A/c,,"₹14,88,852.74",Payment to Kaveri Logistics,BP/24-25/4735,skulkarni,iyer.cfo
+V000026,03-04-2024,03-04-2024 18:51,Sales,Sundry Debtors,"₹1,26,667.84",,Sales to Pinnacle Distributors,INV/24-25/7248,rmehta,bose.mgr
+V000026,03-04-2024,03-04-2024 18:51,Sales,Sales - Domestic,,"₹1,07,345.64",Sales to Pinnacle Distributors,INV/24-25/7248,rmehta,bose.mgr
+V000026,03-04-2024,03-04-2024 18:51,Sales,GST Payable - CGST,,"₹9,661.10",Sales to Pinnacle Distributors,INV/24-25/7248,rmehta,bose.mgr
+V000026,03-04-2024,03-04-2024 18:51,Sales,GST Payable - SGST,,"₹9,661.10",Sales to Pinnacle Distributors,INV/24-25/7248,rmehta,bose.mgr
+V000027,03-04-2024,04-04-2024 09:17,Purchase,Purchases - Raw Material,"₹1,34,529.43",,Purchase from Nova Industrial Spares,PINV/24-25/3075,skulkarni,bose.mgr
+V000027,03-04-2024,04-04-2024 09:17,Purchase,GST Input Credit - CGST,"₹12,107.64",,Purchase from Nova Industrial Spares,PINV/24-25/3075,skulkarni,bose.mgr
+V000027,03-04-2024,04-04-2024 09:17,Purchase,GST Input Credit - SGST,"₹12,107.64",,Purchase from Nova Industrial Spares,PINV/24-25/3075,skulkarni,bose.mgr
+V000027,03-04-2024,04-04-2024 09:17,Purchase,Sundry Creditors,,"₹1,58,744.71",Purchase from Nova Industrial Spares,PINV/24-25/3075,skulkarni,bose.mgr
+V000028,03-04-2024,04-04-2024 17:03,Purchase,Purchases - Raw Material,"₹76,932.09",,Purchase from Kaveri Logistics,PINV/24-25/7945,skulkarni,iyer.cfo
+V000028,03-04-2024,04-04-2024 17:03,Purchase,GST Input Credit - CGST,"₹6,923.88",,Purchase from Kaveri Logistics,PINV/24-25/7945,skulkarni,iyer.cfo
+V000028,03-04-2024,04-04-2024 17:03,Purchase,GST Input Credit - SGST,"₹6,923.88",,Purchase from Kaveri Logistics,PINV/24-25/7945,skulkarni,iyer.cfo
+V000028,03-04-2024,04-04-2024 17:03,Purchase,Sundry Creditors,,"₹90,779.85",Purchase from Kaveri Logistics,PINV/24-25/7945,skulkarni,iyer.cfo
+V000029,03-04-2024,04-04-2024 17:59,Sales,Sundry Debtors,"₹6,15,308.65",,Sales to Sahyadri Retail Pvt Ltd,INV/24-25/9601,rmehta,iyer.cfo
+V000029,03-04-2024,04-04-2024 17:59,Sales,Sales - Domestic,,"₹5,21,448.01",Sales to Sahyadri Retail Pvt Ltd,INV/24-25/9601,rmehta,iyer.cfo
+V000029,03-04-2024,04-04-2024 17:59,Sales,GST Payable - CGST,,"₹46,930.32",Sales to Sahyadri Retail Pvt Ltd,INV/24-25/9601,rmehta,iyer.cfo
+V000029,03-04-2024,04-04-2024 17:59,Sales,GST Payable - SGST,,"₹46,930.32",Sales to Sahyadri Retail Pvt Ltd,INV/24-25/9601,rmehta,iyer.cfo
+V000030,03-04-2024,05-04-2024 18:32,Purchase,Purchases - Raw Material,"₹1,17,773.54",,Purchase from Ganesh Engineering Works,PINV/24-25/6180,skulkarni,iyer.cfo
+V000030,03-04-2024,05-04-2024 18:32,Purchase,GST Input Credit - CGST,"₹10,599.61",,Purchase from Ganesh Engineering Works,PINV/24-25/6180,skulkarni,iyer.cfo
+V000030,03-04-2024,05-04-2024 18:32,Purchase,GST Input Credit - SGST,"₹10,599.61",,Purchase from Ganesh Engineering Works,PINV/24-25/6180,skulkarni,iyer.cfo
+V000030,03-04-2024,05-04-2024 18:32,Purchase,Sundry Creditors,,"₹1,38,972.76",Purchase from Ganesh Engineering Works,PINV/24-25/6180,skulkarni,iyer.cfo
+V000031,04-04-2024,04-04-2024 10:10,Purchase,Purchases - Raw Material,"₹72,598.68",,Purchase from Nova Industrial Spares,PINV/24-25/8238,skulkarni,iyer.cfo
+V000031,04-04-2024,04-04-2024 10:10,Purchase,GST Input Credit - CGST,"₹6,533.88",,Purchase from Nova Industrial Spares,PINV/24-25/8238,skulkarni,iyer.cfo
+V000031,04-04-2024,04-04-2024 10:10,Purchase,GST Input Credit - SGST,"₹6,533.88",,Purchase from Nova Industrial Spares,PINV/24-25/8238,skulkarni,iyer.cfo
+V000031,04-04-2024,04-04-2024 10:10,Purchase,Sundry Creditors,,"₹85,666.44",Purchase from Nova Industrial Spares,PINV/24-25/8238,skulkarni,iyer.cfo
+V000032,04-04-2024,04-04-2024 10:30,Sales,Sundry Debtors,"₹1,19,958.12",,Sales to Orchid Enterprises,INV/24-25/6517,rmehta,menon.fc
+V000032,04-04-2024,04-04-2024 10:30,Sales,Sales - Domestic,,"₹1,01,659.44",Sales to Orchid Enterprises,INV/24-25/6517,rmehta,menon.fc
+V000032,04-04-2024,04-04-2024 10:30,Sales,GST Payable - CGST,,"₹9,149.34",Sales to Orchid Enterprises,INV/24-25/6517,rmehta,menon.fc
+V000032,04-04-2024,04-04-2024 10:30,Sales,GST Payable - SGST,,"₹9,149.34",Sales to Orchid Enterprises,INV/24-25/6517,rmehta,menon.fc
+V000033,04-04-2024,04-04-2024 11:09,Receipt,HDFC Bank - Current A/c,"₹1,04,823.37",,Receipt from Vikram Auto Components Ltd against invoice,RCPT/24-25/9781,rmehta,
+V000033,04-04-2024,04-04-2024 11:09,Receipt,Sundry Debtors,,"₹1,04,823.37",Receipt from Vikram Auto Components Ltd against invoice,RCPT/24-25/9781,rmehta,
+V000034,04-04-2024,04-04-2024 15:36,Purchase,Purchases - Raw Material,"₹16,347.02",,Purchase from Deccan Power Solutions,PINV/24-25/6104,skulkarni,
+V000034,04-04-2024,04-04-2024 15:36,Purchase,GST Input Credit - CGST,"₹1,471.23",,Purchase from Deccan Power Solutions,PINV/24-25/6104,skulkarni,
+V000034,04-04-2024,04-04-2024 15:36,Purchase,GST Input Credit - SGST,"₹1,471.23",,Purchase from Deccan Power Solutions,PINV/24-25/6104,skulkarni,
+V000034,04-04-2024,04-04-2024 15:36,Purchase,Sundry Creditors,,"₹19,289.48",Purchase from Deccan Power Solutions,PINV/24-25/6104,skulkarni,
+V000035,04-04-2024,04-04-2024 18:34,Purchase,Purchases - Raw Material,"₹1,29,149.77",,Purchase from Shree Balaji Traders,PINV/24-25/7796,skulkarni,iyer.cfo
+V000035,04-04-2024,04-04-2024 18:34,Purchase,GST Input Credit - CGST,"₹11,623.47",,Purchase from Shree Balaji Traders,PINV/24-25/7796,skulkarni,iyer.cfo
+V000035,04-04-2024,04-04-2024 18:34,Purchase,GST Input Credit - SGST,"₹11,623.47",,Purchase from Shree Balaji Traders,PINV/24-25/7796,skulkarni,iyer.cfo
+V000035,04-04-2024,04-04-2024 18:34,Purchase,Sundry Creditors,,"₹1,52,396.71",Purchase from Shree Balaji Traders,PINV/24-25/7796,skulkarni,iyer.cfo
+V000036,04-04-2024,04-04-2024 18:34,Sales,Sundry Debtors,"₹49,851.11",,Sales to Trident Manufacturing Co,INV/24-25/9425,rmehta,
+V000036,04-04-2024,04-04-2024 18:34,Sales,Sales - Domestic,,"₹42,246.71",Sales to Trident Manufacturing Co,INV/24-25/9425,rmehta,
+V000036,04-04-2024,04-04-2024 18:34,Sales,GST Payable - CGST,,"₹3,802.20",Sales to Trident Manufacturing Co,INV/24-25/9425,rmehta,
+V000036,04-04-2024,04-04-2024 18:34,Sales,GST Payable - SGST,,"₹3,802.20",Sales to Trident Manufacturing Co,INV/24-25/9425,rmehta,
+V000037,04-04-2024,05-04-2024 11:44,Sales,Sundry Debtors,"₹1,32,658.64",,Sales to Pinnacle Distributors,INV/24-25/2384,rmehta,bose.mgr
+V000037,04-04-2024,05-04-2024 11:44,Sales,Sales - Domestic,,"₹1,12,422.58",Sales to Pinnacle Distributors,INV/24-25/2384,rmehta,bose.mgr
+V000037,04-04-2024,05-04-2024 11:44,Sales,GST Payable - CGST,,"₹10,118.03",Sales to Pinnacle Distributors,INV/24-25/2384,rmehta,bose.mgr
+V000037,04-04-2024,05-04-2024 11:44,Sales,GST Payable - SGST,,"₹10,118.03",Sales to Pinnacle Distributors,INV/24-25/2384,rmehta,bose.mgr
+V000038,04-04-2024,05-04-2024 12:05,Sales,Sundry Debtors,"₹1,28,299.53",,Sales to Trident Manufacturing Co,INV/24-25/1413,rmehta,iyer.cfo
+V000038,04-04-2024,05-04-2024 12:05,Sales,Sales - Domestic,,"₹1,08,728.43",Sales to Trident Manufacturing Co,INV/24-25/1413,rmehta,iyer.cfo
+V000038,04-04-2024,05-04-2024 12:05,Sales,GST Payable - CGST,,"₹9,785.55",Sales to Trident Manufacturing Co,INV/24-25/1413,rmehta,iyer.cfo
+V000038,04-04-2024,05-04-2024 12:05,Sales,GST Payable - SGST,,"₹9,785.55",Sales to Trident Manufacturing Co,INV/24-25/1413,rmehta,iyer.cfo
+V000039,04-04-2024,05-04-2024 12:29,Contra,Cash in Hand,"₹91,060.38",,Cash withdrawn from bank for office use,CTR/24-25/8130,pnair,
+V000039,04-04-2024,05-04-2024 12:29,Contra,HDFC Bank - Current A/c,,"₹91,060.38",Cash withdrawn from bank for office use,CTR/24-25/8130,pnair,
+V000040,04-04-2024,05-04-2024 13:18,Receipt,HDFC Bank - Current A/c,"₹1,56,927.37",,Receipt from Trident Manufacturing Co against invoice,RCPT/24-25/0369,pnair,
+V000040,04-04-2024,05-04-2024 13:18,Receipt,Sundry Debtors,,"₹1,56,927.37",Receipt from Trident Manufacturing Co against invoice,RCPT/24-25/0369,pnair,
+V000041,04-04-2024,05-04-2024 18:17,Sales,Sundry Debtors,"₹50,046.46",,Sales to Trident Manufacturing Co,INV/24-25/0291,rmehta,
+V000041,04-04-2024,05-04-2024 18:17,Sales,Sales - Domestic,,"₹42,412.26",Sales to Trident Manufacturing Co,INV/24-25/0291,rmehta,
+V000041,04-04-2024,05-04-2024 18:17,Sales,GST Payable - CGST,,"₹3,817.10",Sales to Trident Manufacturing Co,INV/24-25/0291,rmehta,
+V000041,04-04-2024,05-04-2024 18:17,Sales,GST Payable - SGST,,"₹3,817.10",Sales to Trident Manufacturing Co,INV/24-25/0291,rmehta,
+V000042,04-04-2024,05-04-2024 18:28,Purchase,Purchases - Raw Material,"₹2,09,140.73",,Purchase from Nova Industrial Spares,PINV/24-25/2740,skulkarni,iyer.cfo
+V000042,04-04-2024,05-04-2024 18:28,Purchase,GST Input Credit - CGST,"₹18,822.66",,Purchase from Nova Industrial Spares,PINV/24-25/2740,skulkarni,iyer.cfo
+V000042,04-04-2024,05-04-2024 18:28,Purchase,GST Input Credit - SGST,"₹18,822.66",,Purchase from Nova Industrial Spares,PINV/24-25/2740,skulkarni,iyer.cfo
+V000042,04-04-2024,05-04-2024 18:28,Purchase,Sundry Creditors,,"₹2,46,786.05",Purchase from Nova Industrial Spares,PINV/24-25/2740,skulkarni,iyer.cfo
+V000043,04-04-2024,06-04-2024 09:58,Purchase,Purchases - Raw Material,"₹2,08,821.44",,Purchase from Deccan Power Solutions,PINV/24-25/8717,skulkarni,iyer.cfo
+V000043,04-04-2024,06-04-2024 09:58,Purchase,GST Input Credit - CGST,"₹18,793.92",,Purchase from Deccan Power Solutions,PINV/24-25/8717,skulkarni,iyer.cfo
+V000043,04-04-2024,06-04-2024 09:58,Purchase,GST Input Credit - SGST,"₹18,793.92",,Purchase from Deccan Power Solutions,PINV/24-25/8717,skulkarni,iyer.cfo
+V000043,04-04-2024,06-04-2024 09:58,Purchase,Sundry Creditors,,"₹2,46,409.28",Purchase from Deccan Power Solutions,PINV/24-25/8717,skulkarni,iyer.cfo
+V000044,04-04-2024,06-04-2024 15:00,Payment,Professional Fees,"₹1,39,870.69",,"Professional Fees paid, TDS deducted",BP/24-25/5915,nreddy,iyer.cfo
+V000044,04-04-2024,06-04-2024 15:00,Payment,TDS Payable - 194J Professional,,"₹13,987.06","Professional Fees paid, TDS deducted",BP/24-25/5915,nreddy,iyer.cfo
+V000044,04-04-2024,06-04-2024 15:00,Payment,HDFC Bank - Current A/c,,"₹1,25,883.63","Professional Fees paid, TDS deducted",BP/24-25/5915,nreddy,iyer.cfo
+V000045,05-04-2024,05-04-2024 11:42,Purchase,Purchases - Raw Material,"₹58,330.50",,Purchase from Ganesh Engineering Works,PINV/24-25/4841,skulkarni,iyer.cfo
+V000045,05-04-2024,05-04-2024 11:42,Purchase,GST Input Credit - CGST,"₹5,249.74",,Purchase from Ganesh Engineering Works,PINV/24-25/4841,skulkarni,iyer.cfo
+V000045,05-04-2024,05-04-2024 11:42,Purchase,GST Input Credit - SGST,"₹5,249.74",,Purchase from Ganesh Engineering Works,PINV/24-25/4841,skulkarni,iyer.cfo
+V000045,05-04-2024,05-04-2024 11:42,Purchase,Sundry Creditors,,"₹68,829.98",Purchase from Ganesh Engineering Works,PINV/24-25/4841,skulkarni,iyer.cfo
+V000046,05-04-2024,05-04-2024 12:09,Sales,Sundry Debtors,"₹46,255.52",,Sales to Sahyadri Retail Pvt Ltd,INV/24-25/8684,rmehta,
+V000046,05-04-2024,05-04-2024 12:09,Sales,Sales - Domestic,,"₹39,199.60",Sales to Sahyadri Retail Pvt Ltd,INV/24-25/8684,rmehta,
+V000046,05-04-2024,05-04-2024 12:09,Sales,GST Payable - CGST,,"₹3,527.96",Sales to Sahyadri Retail Pvt Ltd,INV/24-25/8684,rmehta,
+V000046,05-04-2024,05-04-2024 12:09,Sales,GST Payable - SGST,,"₹3,527.96",Sales to Sahyadri Retail Pvt Ltd,INV/24-25/8684,rmehta,
+V000047,05-04-2024,05-04-2024 12:19,Purchase,Purchases - Raw Material,"₹68,088.29",,Purchase from Nova Industrial Spares,PINV/24-25/8175,skulkarni,menon.fc
+V000047,05-04-2024,05-04-2024 12:19,Purchase,GST Input Credit - CGST,"₹6,127.94",,Purchase from Nova Industrial Spares,PINV/24-25/8175,skulkarni,menon.fc
+V000047,05-04-2024,05-04-2024 12:19,Purchase,GST Input Credit - SGST,"₹6,127.94",,Purchase from Nova Industrial Spares,PINV/24-25/8175,skulkarni,menon.fc
+V000047,05-04-2024,05-04-2024 12:19,Purchase,Sundry Creditors,,"₹80,344.17",Purchase from Nova Industrial Spares,PINV/24-25/8175,skulkarni,menon.fc
+V000048,05-04-2024,05-04-2024 13:44,Payment,Bank Charges,₹82.53,,Bank charges debited by HDFC Bank,,SYSTEM,
+V000048,05-04-2024,05-04-2024 13:44,Payment,HDFC Bank - Current A/c,,₹82.53,Bank charges debited by HDFC Bank,,SYSTEM,
+V000049,05-04-2024,05-04-2024 14:14,Payment,Sundry Creditors,"₹95,419.39",,Payment to Shree Balaji Traders,BP/24-25/6626,pnair,menon.fc
+V000049,05-04-2024,05-04-2024 14:14,Payment,HDFC Bank - Current A/c,,"₹95,419.39",Payment to Shree Balaji Traders,BP/24-25/6626,pnair,menon.fc
+V000050,05-04-2024,05-04-2024 14:23,Payment,Sundry Creditors,"₹54,836.95",,Payment to Nova Industrial Spares,BP/24-25/2915,skulkarni,bose.mgr
+V000050,05-04-2024,05-04-2024 14:23,Payment,HDFC Bank - Current A/c,,"₹54,836.95",Payment to Nova Industrial Spares,BP/24-25/2915,skulkarni,bose.mgr
+V000051,05-04-2024,05-04-2024 14:33,Sales,Sundry Debtors,"₹2,52,566.24",,Sales to Rajdhani Marketing,INV/24-25/3242,rmehta,iyer.cfo
+V000051,05-04-2024,05-04-2024 14:33,Sales,Sales - Domestic,,"₹2,14,039.20",Sales to Rajdhani Marketing,INV/24-25/3242,rmehta,iyer.cfo
+V000051,05-04-2024,05-04-2024 14:33,Sales,GST Payable - CGST,,"₹19,263.52",Sales to Rajdhani Marketing,INV/24-25/3242,rmehta,iyer.cfo
+V000051,05-04-2024,05-04-2024 14:33,Sales,GST Payable - SGST,,"₹19,263.52",Sales to Rajdhani Marketing,INV/24-25/3242,rmehta,iyer.cfo
+V000052,05-04-2024,05-04-2024 14:55,Payment,Professional Fees,"₹14,916.14",,"Professional Fees paid, TDS deducted",BP/24-25/1651,nreddy,
+V000052,05-04-2024,05-04-2024 14:55,Payment,TDS Payable - 194J Professional,,"₹1,491.61","Professional Fees paid, TDS deducted",BP/24-25/1651,nreddy,
+V000052,05-04-2024,05-04-2024 14:55,Payment,HDFC Bank - Current A/c,,"₹13,424.53","Professional Fees paid, TDS deducted",BP/24-25/1651,nreddy,
+V000053,05-04-2024,05-04-2024 15:46,Receipt,HDFC Bank - Current A/c,"₹14,371.76",,Receipt from Rajdhani Marketing against invoice,RCPT/24-25/4700,pnair,
+V000053,05-04-2024,05-04-2024 15:46,Receipt,Sundry Debtors,,"₹14,371.76",Receipt from Rajdhani Marketing against invoice,RCPT/24-25/4700,pnair,
+V000054,05-04-2024,05-04-2024 16:37,Sales,Sundry Debtors,"₹1,07,045.34",,Sales to Pinnacle Distributors,INV/24-25/6928,rmehta,bose.mgr
+V000054,05-04-2024,05-04-2024 16:37,Sales,Sales - Domestic,,"₹90,716.40",Sales to Pinnacle Distributors,INV/24-25/6928,rmehta,bose.mgr
+V000054,05-04-2024,05-04-2024 16:37,Sales,GST Payable - CGST,,"₹8,164.47",Sales to Pinnacle Distributors,INV/24-25/6928,rmehta,bose.mgr
+V000054,05-04-2024,05-04-2024 16:37,Sales,GST Payable - SGST,,"₹8,164.47",Sales to Pinnacle Distributors,INV/24-25/6928,rmehta,bose.mgr
+V000055,05-04-2024,05-04-2024 16:38,Payment,Freight & Transport,"₹95,510.30",,"Freight & Transport paid, TDS deducted",BP/24-25/6779,pnair,bose.mgr
+V000055,05-04-2024,05-04-2024 16:38,Payment,TDS Payable - 194C Contractors,,"₹1,910.20","Freight & Transport paid, TDS deducted",BP/24-25/6779,pnair,bose.mgr
+V000055,05-04-2024,05-04-2024 16:38,Payment,HDFC Bank - Current A/c,,"₹93,600.10","Freight & Transport paid, TDS deducted",BP/24-25/6779,pnair,bose.mgr
+V000056,05-04-2024,06-04-2024 09:53,Sales,Sundry Debtors,"₹1,01,883.33",,Sales to Rajdhani Marketing,INV/24-25/8613,rmehta,bose.mgr
+V000056,05-04-2024,06-04-2024 09:53,Sales,Sales - Domestic,,"₹86,341.81",Sales to Rajdhani Marketing,INV/24-25/8613,rmehta,bose.mgr
+V000056,05-04-2024,06-04-2024 09:53,Sales,GST Payable - CGST,,"₹7,770.76",Sales to Rajdhani Marketing,INV/24-25/8613,rmehta,bose.mgr
+V000056,05-04-2024,06-04-2024 09:53,Sales,GST Payable - SGST,,"₹7,770.76",Sales to Rajdhani Marketing,INV/24-25/8613,rmehta,bose.mgr
+V000057,05-04-2024,06-04-2024 13:25,Sales,Sundry Debtors,"₹67,284.43",,Sales to Trident Manufacturing Co,INV/24-25/2987,rmehta,menon.fc
+V000057,05-04-2024,06-04-2024 13:25,Sales,Sales - Domestic,,"₹57,020.71",Sales to Trident Manufacturing Co,INV/24-25/2987,rmehta,menon.fc
+V000057,05-04-2024,06-04-2024 13:25,Sales,GST Payable - CGST,,"₹5,131.86",Sales to Trident Manufacturing Co,INV/24-25/2987,rmehta,menon.fc
+V000057,05-04-2024,06-04-2024 13:25,Sales,GST Payable - SGST,,"₹5,131.86",Sales to Trident Manufacturing Co,INV/24-25/2987,rmehta,menon.fc
+V000058,05-04-2024,06-04-2024 16:37,Purchase,Purchases - Raw Material,"₹14,866.61",,Purchase from Shree Balaji Traders,PINV/24-25/9254,skulkarni,
+V000058,05-04-2024,06-04-2024 16:37,Purchase,GST Input Credit - CGST,"₹1,337.99",,Purchase from Shree Balaji Traders,PINV/24-25/9254,skulkarni,
+V000058,05-04-2024,06-04-2024 16:37,Purchase,GST Input Credit - SGST,"₹1,337.99",,Purchase from Shree Balaji Traders,PINV/24-25/9254,skulkarni,
+V000058,05-04-2024,06-04-2024 16:37,Purchase,Sundry Creditors,,"₹17,542.59",Purchase from Shree Balaji Traders,PINV/24-25/9254,skulkarni,
+V000059,05-04-2024,07-04-2024 11:06,Purchase,Purchases - Raw Material,"₹39,019.52",,Purchase from Kaveri Logistics,PINV/24-25/9637,skulkarni,
+V000059,05-04-2024,07-04-2024 11:06,Purchase,GST Input Credit - CGST,"₹3,511.75",,Purchase from Kaveri Logistics,PINV/24-25/9637,skulkarni,
+V000059,05-04-2024,07-04-2024 11:06,Purchase,GST Input Credit - SGST,"₹3,511.75",,Purchase from Kaveri Logistics,PINV/24-25/9637,skulkarni,
+V000059,05-04-2024,07-04-2024 11:06,Purchase,Sundry Creditors,,"₹46,043.02",Purchase from Kaveri Logistics,PINV/24-25/9637,skulkarni,
+V000060,05-04-2024,08-04-2024 10:28,Purchase,Purchases - Raw Material,"₹1,82,352.74",,Purchase from Ganesh Engineering Works,PINV/24-25/4292,skulkarni,menon.fc
+V000060,05-04-2024,08-04-2024 10:28,Purchase,GST Input Credit - CGST,"₹16,411.74",,Purchase from Ganesh Engineering Works,PINV/24-25/4292,skulkarni,menon.fc
+V000060,05-04-2024,08-04-2024 10:28,Purchase,GST Input Credit - SGST,"₹16,411.74",,Purchase from Ganesh Engineering Works,PINV/24-25/4292,skulkarni,menon.fc
+V000060,05-04-2024,08-04-2024 10:28,Purchase,Sundry Creditors,,"₹2,15,176.22",Purchase from Ganesh Engineering Works,PINV/24-25/4292,skulkarni,menon.fc

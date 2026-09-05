@@ -70,3 +70,43 @@ No code written — Phase 0 forbids implementation before sign-off. Verification
 - **C-1 (not yet — Phase 7 only)** Railway's free plan gives 0.5 GB of RAM, which cannot run this application. A working public demo needs the **$5/month Hobby plan**. Either approve that spend later, or we do a local-only demo with a screen recording for zero cost. **Phases 1 through 6 need no credentials and no money at all.**
 
 **Next step:** Await sign-off on F-1 to F-4, then begin Phase 1 — move the repo to root, set up tooling and CI, define the canonical journal-entry schema, and build the seeded Indian ledger generator with its decoys.
+
+---
+
+## 2026-09-06 03:05 IST — [PHASE 1] Foundation built. The benchmark works, and two bugs got caught by checking.
+
+**What happened:**
+Phase 1 is done and green. This phase deliberately contains **no detection logic at all** — it builds the ground the research stands on: one shared data format, a way to get real files into it, and the synthetic Indian ledger that everything will be measured against.
+
+*The repository is now a repository.* The starter files moved out of `mnt/data/ca-guard-starter/` to the root with their history intact, and the project has proper tooling: dependency pinning, linting, type checking, a test suite, a `Makefile`, and free GitHub Actions CI.
+
+*Money is now stored as whole paise, not rupees-with-decimals.* This sounds like a technicality and is not. If you store money as a decimal fraction, a few thousand entries drift by tiny amounts and vouchers stop balancing by a paisa here and there. The usual fix is to allow a small "close enough" margin — but in an audit tool, that margin is exactly where a genuine imbalance would hide. Storing whole paise means a voucher either balances perfectly or it does not, with no judgement call.
+
+*The canonical schema is built around Indian reality:* the financial year runs April to March, so year-end means 31 March; vouchers are Journal/Payment/Receipt/Contra/Sales/Purchase; amounts are in rupees and display in the lakh/crore grouping a CA reads. It separates the *date on the voucher* from the *time it was actually typed in*, and it records whether that time is real — because the VynFi corpus has no real posting times, and treating midnight as fact would make all 667,584 of its rows look like suspicious after-hours entries.
+
+*The Indian ledger generator is the important deliverable.* It produces a year of book-keeping for a mid-size Indian company — GST split into CGST and SGST, TDS under 194J/194C/192, PF, realistic vendor and customer names, staff who each have their own area of work. Into that it plants ten kinds of irregularity, and — more importantly — six kinds of **decoy**: entries that look suspicious but are completely legitimate. Rent that is a round ₹2,00,000 every month because the lease says so. An identical loan EMI every month. Depreciation dated 31 March, properly documented and approved. Bank charges auto-posted with no voucher.
+
+The decoys are the point. Without them, a detector that flagged every round number and every 31 March entry would score beautifully and be useless in practice — a CA would drown in false alarms on the first day.
+
+**Why it matters:**
+Phase 0 rejected the VynFi dataset because its "fraud" labels didn't match its data. The obvious risk was that we'd make the same mistake in our own generator and not notice. So the test suite now runs **the exact measurement that exposed VynFi against our own data**, every time. VynFi's labels scored 0.31x–1.0x, meaning no signal. Ours score **61x to 500x**. If that ever slips, the build fails.
+
+There is also now a test that physically prevents the detector code (coming in Phase 2) from importing the generator or its answer key. That rule was written down in Phase 0; it is now enforced by a machine rather than by memory. It caught a real violation the first time it ran.
+
+**Two things found by checking instead of assuming:**
+
+1. **The VynFi ledger doesn't balance.** 599 of its 143,602 vouchers have debits and credits that don't match — some by crores, because of how it was generated. We report this rather than quietly patching it. It also confirms the decision to store whole paise was right.
+
+2. **My first generated ledger had four rent payments on 1 April.** I only caught this by opening the sample and reading it the way a CA would. Rent is monthly; four in one day is something a practitioner would spot in seconds and would have discredited the whole dataset. Recurring entries are now capped at one per month, with a test so it cannot come back.
+
+**Tests/checks:** `ruff` clean, `ruff format` clean, `pyright` 0 errors, **95 tests passing**. The full VynFi corpus — 667,584 lines — ingests end to end in 28 seconds on this 8 GB laptop, with 99.93% of rows accepted and everything rejected explained. Generation is reproducible: same seed, same content hash.
+
+**Git commit:** see below.
+
+**Founder decision needed:** none. Phase 1 stayed inside the approved scope.
+
+**Credentials needed:** none. Nothing was purchased and nothing needs to be. Per your instruction, the whole build runs locally at ₹0, and CI is free.
+
+**Prepared for you — the CA review:** `docs/ca_validation/` now contains a 60-voucher sample formatted the way a CA reads a ledger, plus a 13-question sheet. It takes about 20 minutes and needs no software. The important question is #9: *which of these would you want to examine, and why* — asked before showing them our list, so we get their unprompted judgement rather than agreement with ours. As you directed, this does not block Phase 2.
+
+**Next step:** Phase 2 — the deterministic audit-review signals (duplicates, round numbers, off-hours, period-end, rare account pairs, threshold adjacency, missing evidence). Success is measured two ways: does it find the planted anomalies, and does it leave the decoys alone.

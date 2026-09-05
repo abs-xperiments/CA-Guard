@@ -1,0 +1,82 @@
+# CA-Guard
+
+**Design and Development of a Privacy-Preserving On-Premise Hybrid AI Framework for Evidence-Grounded Financial Anomaly Detection and Human-in-the-Loop Audit Review**
+
+CA-Guard is a three-month academic prototype for Chartered Accountants and accountants. It reviews financial journal/transaction data, prioritises unusual items, explains why they were flagged, retrieves supporting evidence, and leaves the final decision to the professional.
+
+## Product sentence
+> A private AI second-hand that tells a CA what deserves attention.
+
+## Scope
+CA-Guard is limited to financial anomaly review and audit-oriented triage. It is **not** an autonomous auditor, tax filer, GST filer, ERP, or Tally replacement, and it does not determine fraud.
+
+## Research hypothesis
+Fusing deterministic audit-review rules, statistical deviations, ML anomaly signals **and evidence availability** produces a more useful review queue than a single detector, while evidence-grounded explanations make results easier for a professional to review.
+
+Signal fusion itself is an engineering technique, not our novelty — commercial products already ship it. What this project contributes is the combination of **on-premise processing, open source, and a reproducible benchmark whose ground truth is inspectable**. See `docs/02_MARKET_AND_COMPETITIVE.md`.
+
+## Status
+
+| Phase | State |
+|---|---|
+| 0 — Research and decision gate | ✅ Complete (`docs/phase-plans/PHASE-0-RESEARCH-DECISION.md`) |
+| 1 — Foundation: schema, intake, benchmark generator | ✅ Complete |
+| 2 — Deterministic audit-review signals | Next |
+| 3–7 | Planned (`docs/11_IMPLEMENTATION_ROADMAP.md`) |
+
+No detection logic exists yet. Phase 1 built the substrate: the canonical schema, the ingestion path, and the benchmark.
+
+## Quickstart
+
+Requires [uv](https://docs.astral.sh/uv/) and Python 3.13. Everything below runs locally and costs nothing.
+
+```bash
+make install        # create the venv and install dependencies
+make check          # lint + type-check + tests — the gate every phase must pass
+make generate       # write a reproducible synthetic Indian ledger
+```
+
+Generate a benchmark ledger and inspect a real corpus:
+
+```bash
+uv run caguard generate --vouchers 4000        # ledger + ground truth + manifest
+uv run caguard columns  ledger.csv             # how do these headers map?
+uv run caguard ingest   ledger.csv             # convert and report data quality
+
+make data                                       # fetch the VynFi corpus (~34 MB)
+uv run caguard ingest data/external/shard0.parquet --vynfi
+```
+
+## Data
+
+Two datasets, with deliberately different jobs (`data/SOURCES.md`, `docs/adr/0001-*`):
+
+- **`VynFi/vynfi-journal-entries-1m`** (Apache-2.0, 667,584 lines) — used **only** for ingestion, schema mapping and throughput. Its fraud/anomaly labels are not recoverable from its data, so it is never used for accuracy metrics.
+- **The project's own seeded Indian ledger** — the sole accuracy benchmark. Reproducible from a fixed seed, with ground truth written to a separate file that no detector may read, and with legitimate look-alike "decoys" that a careless detector will wrongly flag.
+
+Generated and downloaded data is never committed.
+
+## Privacy
+
+The private path is self-hosted: sensitive data stays on the firm's machine and no external model is called. A future Railway demo would be a **public demonstration environment using synthetic data only** — it is not the private product. See `docs/08_SECURITY_PRIVACY.md`.
+
+## Repository
+
+```
+src/caguard/
+  money.py            integer paise, so vouchers balance exactly
+  schema.py           the canonical journal-entry schema
+  intake/             readers, column mapping, validation
+  adapters/vynfi.py   the SAP-shaped external corpus
+  benchmark/          the generator — importable by nothing else (ADR-0003)
+  cli.py
+tests/                95 tests, including the benchmark-integrity guards
+docs/                 the method: charter, research, ADRs, phase plans
+journal.md            the running record, in plain language
+```
+
+## Project rules
+`CLAUDE.md` is the project constitution. Decisions live in `docs/DECISION_LOG.md` and `docs/adr/`.
+
+## Licence
+MIT. The generated benchmark contains no real person's or company's data.
