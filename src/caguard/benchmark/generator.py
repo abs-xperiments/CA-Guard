@@ -159,12 +159,20 @@ class _Builder:
                 continue
             return day
 
-    def business_time(self, day: date, *, lag_days: int | None = None) -> datetime:
-        """A plausible posting timestamp: same day or a day or two later, in office hours."""
+    def business_time(
+        self, day: date, *, lag_days: int | None = None, allow_sunday: bool = False
+    ) -> datetime:
+        """A plausible posting timestamp: same day or a day or two later, in office hours.
+
+        The lag never lands on a Sunday unless asked. Without that, an ordinary
+        Saturday voucher posted "one day later" becomes a Sunday entry, and the
+        weekend signal fills up with vouchers nobody actually touched.
+        """
         if lag_days is None:
             lag_days = self.rng.choices([0, 1, 2, 3], weights=[60, 25, 10, 5])[0]
-        lag = lag_days
-        posted_day = day + timedelta(days=lag)
+        posted_day = day + timedelta(days=lag_days)
+        while posted_day.weekday() == 6 and not allow_sunday:
+            posted_day += timedelta(days=1)
         lo, hi = coa.BUSINESS_HOURS
         return datetime(  # noqa: DTZ001 — books are kept in local time; no tz in the source data
             posted_day.year,

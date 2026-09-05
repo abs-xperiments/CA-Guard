@@ -22,12 +22,13 @@ from caguard.schema import VoucherType
 # --- ordinary business -------------------------------------------------------
 
 _NORMAL_MIX: tuple[tuple[str, int], ...] = (
-    ("sales", 30),
-    ("purchase", 25),
-    ("receipt", 15),
+    ("sales", 28),
+    ("purchase", 24),
+    ("receipt", 14),
     ("pay_vendor", 12),
     ("pay_expense", 10),
     ("salary", 5),
+    ("director_pay", 4),
     ("contra", 3),
 )
 _KINDS = [k for k, _ in _NORMAL_MIX]
@@ -113,6 +114,24 @@ def emit_normal(b: _Builder) -> int:
             narration="Salary payable for the month",
             document_ref=b.doc_ref("PAY"),
             approved_by=b.rng.choice(coa.APPROVERS),
+            is_manual=True,
+        )
+    elif kind == "director_pay":
+        # Directors are paid every month, by payroll. Without this the ledger has
+        # no legitimate baseline on Director Remuneration, so "posted by someone
+        # outside their normal area" has nothing to be unusual against.
+        month_end = _month_end(day)
+        gross = amount * 3
+        tds = gross * coa.TDS_192_PCT // 100
+        b.add(
+            voucher_type=VoucherType.JOURNAL,
+            voucher_date=month_end,
+            posted_at=b.business_time(month_end, lag_days=1),
+            legs=[("5110", gross, 0), ("2202", 0, tds), ("2300", 0, gross - tds)],
+            narration="Director remuneration for the month, TDS deducted",
+            document_ref=b.doc_ref("PAY"),
+            approved_by=b.rng.choice(coa.APPROVERS),
+            created_by="avarma",
             is_manual=True,
         )
     else:  # contra
@@ -252,7 +271,7 @@ def _sunday_posting(b: _Builder) -> int:
     b.add(
         voucher_type=VoucherType.JOURNAL,
         voucher_date=sunday,
-        posted_at=b.business_time(sunday, lag_days=0),
+        posted_at=b.business_time(sunday, lag_days=0, allow_sunday=True),
         legs=[("5900", amount, 0), ("2000", 0, amount)],
         narration="Expense booked",
         document_ref=b.doc_ref("JV"),
@@ -281,26 +300,43 @@ def _year_end_manual(b: _Builder) -> int:
     return 1
 
 
+#: Account combinations that make no business sense together. Varied rather than
+#: repeated: planting one pairing eight times would make it common, and a signal
+#: that "found" it would be finding an artefact of the generator.
+_ODD_PAIRINGS: tuple[tuple[str, str], ...] = (
+    ("5110", "1800"),  # Director Remuneration settled against Suspense
+    ("1800", "1010"),  # Suspense cleared straight to bank
+    ("5900", "1800"),  # Miscellaneous Expenses parked in Suspense
+    ("1800", "4100"),  # Suspense released to Other Income
+    ("5920", "2000"),  # Depreciation booked against a trade creditor
+    ("3100", "1010"),  # Retained Earnings paid out of the bank account
+    ("1500", "4000"),  # Plant & Machinery credited to Sales
+    ("2500", "4100"),  # Term loan written back to Other Income
+)
+
+
 def _rare_pair(b: _Builder) -> int:
-    """Value routed through the suspense account — a pairing that occurs nowhere else."""
+    """A combination of accounts that occurs almost nowhere else in the ledger."""
+    debit, credit = _ODD_PAIRINGS[b.occurrence("rare_pair") % len(_ODD_PAIRINGS)]
     amount = b.amount_paise(mu=12.0)
+    day = b.working_day()
     b.add(
         voucher_type=VoucherType.JOURNAL,
-        voucher_date=b.working_day(),
-        posted_at=b.business_time(b.working_day()),
-        legs=[("5110", amount, 0), ("1800", 0, amount)],
+        voucher_date=day,
+        posted_at=b.business_time(day),
+        legs=[(debit, amount, 0), (credit, 0, amount)],
         narration="Adjustment entry",
         document_ref=None,
         is_manual=True,
         anomalies=[AnomalyKind.RARE_ACCOUNT_PAIR],
-        note="Director Remuneration settled against Suspense Account",
+        note=f"{coa.account(debit).name} settled against {coa.account(credit).name}",
     )
     return 1
 
 
 def _threshold_adjacent(b: _Builder) -> int:
     """Just under the delegation limit, and conveniently unapproved."""
-    amount = coa.APPROVAL_LIMIT_PAISE - b.rng.randint(100, 80_00)
+    amount = coa.APPROVAL_LIMIT_PAISE - b.rng.randint(100, 4_500_00)
     vendor = b.rng.choice(coa.VENDORS)
     day = b.working_day()
     b.add(
@@ -336,21 +372,37 @@ def _missing_document(b: _Builder) -> int:
     return 1
 
 
+#: Accounts with a clear regular owner, each paired with what the entry would
+#: plausibly say. Varied for the same reason as the odd pairings: eight entries
+#: by the same person on the same account stops being unusual and starts being
+#: that person's job.
+_OFF_PATCH_TARGETS: tuple[tuple[str, str], ...] = (
+    ("5110", "Remuneration paid"),
+    ("4000", "Sales adjustment posted"),
+    ("5000", "Purchase adjustment posted"),
+    ("5100", "Wages settled"),
+    ("5500", "Consultant paid"),
+    ("2000", "Creditor balance settled"),
+)
+
+
 def _unusual_preparer(b: _Builder) -> int:
-    """Posted by someone who never otherwise touches these accounts."""
+    """Posted by someone outside their normal area of work for this account."""
+    target, narration = _OFF_PATCH_TARGETS[b.occurrence("off_patch") % len(_OFF_PATCH_TARGETS)]
+    codes = [target, "1010"]
     amount = b.amount_paise()
-    codes = ["5110", "1010"]
+    day = b.working_day()
     b.add(
         voucher_type=VoucherType.PAYMENT,
-        voucher_date=b.working_day(),
-        posted_at=b.business_time(b.working_day()),
-        legs=[(codes[0], amount, 0), (codes[1], 0, amount)],
-        narration="Remuneration paid",
+        voucher_date=day,
+        posted_at=b.business_time(day),
+        legs=[(target, amount, 0), ("1010", 0, amount)],
+        narration=narration,
         document_ref=b.doc_ref("BP"),
         created_by=b.outsider_for(codes),
         is_manual=True,
         anomalies=[AnomalyKind.UNUSUAL_PREPARER_ACCOUNT],
-        note="Preparer is outside their normal area of work for this account",
+        note=f"Preparer is outside their normal area of work for account {target}",
     )
     return 1
 

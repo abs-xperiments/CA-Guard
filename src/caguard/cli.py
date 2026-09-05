@@ -117,5 +117,54 @@ def columns(
         typer.secho("Mapping is usable.", fg=typer.colors.GREEN)
 
 
+@app.command()
+def detect(
+    path: Annotated[Path, typer.Argument(help="Ledger file (.csv/.xlsx/.parquet)")],
+    vynfi: Annotated[bool, typer.Option("--vynfi", help="Treat input as the VynFi corpus")] = False,
+    approval_limit: Annotated[
+        int, typer.Option(help="Delegation-of-authority limit in rupees (firm-specific)")
+    ] = 50_000,
+    top: Annotated[int, typer.Option(help="How many findings to show")] = 15,
+) -> None:
+    """Run the audit-review signals over a ledger and print the review queue.
+
+    Signals are reported separately, never blended into one number — a reviewer
+    needs to see which concern fired, not a score they cannot argue with.
+    """
+    from caguard.adapters.vynfi import adapt
+    from caguard.detect import DetectorConfig, run_signals
+    from caguard.detect.runner import count_by_kind, group_by_voucher
+    from caguard.intake.readers import IntakeError, read_table
+    from caguard.money import format_inr
+
+    try:
+        frame = read_table(path)
+    except IntakeError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise typer.Exit(1) from exc
+
+    canonical = adapt(frame) if vynfi else frame
+    config = DetectorConfig(approval_limit_paise=approval_limit * 100)
+    hits = run_signals(canonical, config)
+    grouped = group_by_voucher(hits)
+
+    total = canonical["voucher_id"].nunique()
+    typer.echo(
+        f"\n{len(grouped):,} of {total:,} vouchers flagged "
+        f"({len(grouped) / total:.1%}) — approval limit {format_inr(config.approval_limit_paise)}\n"
+    )
+    for kind, count in sorted(count_by_kind(hits).items(), key=lambda kv: -kv[1]):
+        if count:
+            typer.echo(f"  {kind.value:28s} {count:6,}")
+
+    ranked = sorted(grouped.items(), key=lambda kv: -sum(h.strength for h in kv[1]))
+    typer.echo(f"\nTop {min(top, len(ranked))} for review:\n")
+    for voucher_id, voucher_hits in ranked[:top]:
+        concerns = ", ".join(sorted(h.kind.value for h in voucher_hits))
+        typer.secho(f"  {voucher_id}  [{concerns}]", fg=typer.colors.YELLOW)
+        for hit in voucher_hits:
+            typer.echo(f"      {hit.reason}")
+
+
 if __name__ == "__main__":
     app()

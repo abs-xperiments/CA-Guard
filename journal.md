@@ -110,3 +110,55 @@ There is also now a test that physically prevents the detector code (coming in P
 **Prepared for you — the CA review:** `docs/ca_validation/` now contains a 60-voucher sample formatted the way a CA reads a ledger, plus a 13-question sheet. It takes about 20 minutes and needs no software. The important question is #9: *which of these would you want to examine, and why* — asked before showing them our list, so we get their unprompted judgement rather than agreement with ours. As you directed, this does not block Phase 2.
 
 **Next step:** Phase 2 — the deterministic audit-review signals (duplicates, round numbers, off-hours, period-end, rare account pairs, threshold adjacency, missing evidence). Success is measured two ways: does it find the planted anomalies, and does it leave the decoys alone.
+
+---
+
+## 2026-09-06 04:20 IST — [PHASE 2] Ten signals working. Four bugs found, and three of them were mine.
+
+**What happened:**
+CA-Guard can now read a ledger and tell you which entries deserve a look, with a plain-English reason and the underlying facts attached to each one. Ten signals: duplicate payments, suspiciously round amounts, late-night entries, Sunday entries, undocumented year-end adjustments, odd account combinations, payments sitting just under the approval limit, material entries with no supporting document, someone posting outside their normal area of work, and entries made after the books closed.
+
+**How it was measured.** Every signal was graded twice: did it find the irregularities planted for it, *and* did it leave alone the legitimate look-alike built to trap it. That second half is the one that matters. A tool that flags every round number and every 31 March entry would score perfectly on the first test and be thrown out by a real CA on the first morning.
+
+The numbers below come from **five ledgers generated with seeds I never used while building the signals**. That distinction matters: I spent the session adjusting thresholds against one dataset, so any result measured on that same dataset would be worth nothing. These are from data the code had never seen.
+
+| | |
+|---|---|
+| Nine of ten signals | found **100%** of what they were responsible for |
+| `unusual_preparer_account` | 98% average, 88% on its worst ledger |
+| Legitimate entries wrongly flagged | **zero**, on every trap, on every seed |
+| Decoys reaching the queue by any route | **0 out of 1,000** |
+| Review queue | **5% of the ledger**, containing essentially every planted irregularity |
+
+In practical terms: a CA opens a 4,000-voucher ledger and gets about 200 to look at, and the ones worth finding are in there.
+
+**Four bugs, found by measuring instead of assuming — and three were in my own benchmark, not the detectors:**
+
+1. **The "odd account combination" signal flagged 95% of the real VynFi ledger.** That dataset has thousands of account codes, so nearly every pairing is unusual, and "unusual" stopped meaning anything. The fix follows the same principle we already use for posting times: when a signal can't actually distinguish anything on a given ledger, it should say nothing rather than flag everything. VynFi's queue went from 95.6% to 13.3%, and our benchmark was unaffected.
+
+2. **Two of my generated patterns picked two different random dates** — one for the voucher, one for when it was "typed in" — so entries appeared to be posted months before they were dated. That falsely tripped the after-the-close signal on 26 legitimate entries.
+
+3. **Ordinary entries could land on a Sunday**, because when I added a delay between the transaction date and the posting date I never checked what day it landed on. Eighteen perfectly normal vouchers were showing up in the Sunday signal.
+
+4. **Planting eight identical irregularities made them normal.** A "rare" account pairing that appears eight times isn't rare, and a person who posts to the same account eight times is just doing their job. Both now vary across a set of different combinations — which is also closer to how a real ledger behaves.
+
+I want to be straightforward that items 2 through 4 were faults in the test data I built last phase, not in the detection logic. They are exactly why the two-sided measurement exists: if I had only checked "did we find the planted items", all four would have gone unnoticed.
+
+**One more correction:** my "just below the approval limit" band was set at ₹100. That would only catch someone hugging a ₹50,000 limit to the last rupee, which is not how a payment actually gets split. Widened to ₹5,000, or 10% of the limit.
+
+**Why it matters:**
+Every finding now carries a structured record of the facts behind it — the amount, the dates, who posted it, what was missing. That is deliberate groundwork: in Phase 5 the local AI model will be allowed to explain findings *only* from that record and nothing else. Building it into the data shape now is what will make "the AI cannot make things up" a property of the system rather than a hopeful instruction in a prompt.
+
+The signals also physically cannot see the answer key. A test walks the code and fails the build if anything under the detection folder so much as imports the benchmark. That rule was written down in Phase 0; it is now machine-enforced with no exceptions permitted for detectors.
+
+**Tests/checks:** ruff clean, pyright 0 errors, **205 tests passing** (203 offline, 2 against the full 667,584-line VynFi corpus). All ten signals run on that real corpus without incident, and the late-night signal correctly stays silent there because that dataset has no real posting times.
+
+**Git commit:** see below.
+
+**Founder decision needed:** none. Phase 2 stayed inside the approved scope.
+
+**Credentials needed:** none. Still ₹0 — everything runs locally, CI is free.
+
+**Still open:** the CA review pack from Phase 1 (`docs/ca_validation/`). It remains the only outside check on whether this data resembles a real Indian ledger, and three of the four bugs above were realism faults that a practitioner would have spotted faster than I did. Not blocking.
+
+**Next step:** Phase 3 — the statistical and machine-learning layer (Benford's law, deviation from account norms, an Isolation Forest), measured against the same two baselines so we can say honestly whether it adds anything the rules did not already catch.

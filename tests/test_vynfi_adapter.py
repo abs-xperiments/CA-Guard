@@ -125,3 +125,32 @@ def test_full_corpus_ingests() -> None:
     vouchers, rejected = build_vouchers(report.lines)
     assert len(vouchers) > 100_000
     assert len(rejected) / (len(vouchers) + len(rejected)) < 0.01
+
+
+@pytest.mark.slow
+def test_signals_run_on_the_full_corpus() -> None:
+    """Robustness, not accuracy.
+
+    VynFi's labels are unusable (ADR-0001), so nothing here scores the signals.
+    What it proves is that they survive a real, foreign, 667,584-line export
+    without crashing — and that the off-hours signal stays silent, because every
+    posting in the corpus is timestamped midnight.
+    """
+    from caguard.detect import SignalKind, run_signals
+    from caguard.detect.context import build_context
+    from caguard.detect.runner import flagged_vouchers
+    from caguard.schema import TimeFidelity
+
+    shards = sorted(CORPUS.glob("shard*.parquet"))
+    if not shards:
+        pytest.skip("VynFi corpus not downloaded; run `make data` to fetch it")
+
+    canonical = adapt(pd.concat([pd.read_parquet(p) for p in shards], ignore_index=True))
+    context = build_context(canonical)
+    assert context.time_fidelity == TimeFidelity.DATE_ONLY
+
+    hits = run_signals(canonical)
+    assert hits, "no signal fired on 667k lines, which would suggest a wiring fault"
+    assert not flagged_vouchers(hits, SignalKind.OFF_HOURS_POSTING), (
+        "off-hours fired on a date-only corpus — this is the Phase 0 failure mode"
+    )

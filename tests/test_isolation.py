@@ -20,9 +20,14 @@ import pytest
 SRC = Path(__file__).resolve().parents[1] / "src" / "caguard"
 BENCHMARK_PACKAGE = "caguard.benchmark"
 
-#: The only modules permitted to reach the generator, each with a stated reason.
-#: Kept deliberately tiny and asserted below — an exception list that grows
-#: quietly is the same as having no rule. A detector must never appear here.
+#: Detection code. Nothing here may reach the generator, under any justification.
+#: This is the half of the rule that actually protects the research: a detector
+#: that could read the generator's constants or its answer key would be scored
+#: against knowledge it will not have on a real client ledger.
+DETECT_PACKAGE = SRC / "detect"
+
+#: Everywhere else, a tiny allowlist with stated reasons. Tool entry points
+#: legitimately need to invoke the generator; detectors never do.
 ALLOWED_IMPORTERS: dict[str, str] = {
     "cli.py": "the `caguard generate` command must be able to invoke the generator",
 }
@@ -50,6 +55,32 @@ def _imported_names(tree: ast.AST) -> set[str]:
 def test_source_tree_is_not_empty() -> None:
     """Guards the guard: an empty scan would pass vacuously."""
     assert _modules_outside_benchmark()
+
+
+def _detect_modules() -> list[Path]:
+    return sorted(DETECT_PACKAGE.rglob("*.py")) if DETECT_PACKAGE.is_dir() else []
+
+
+@pytest.mark.parametrize("module", _detect_modules(), ids=lambda p: f"detect/{p.stem}")
+def test_detectors_can_never_reach_the_generator(module: Path) -> None:
+    """The strict half of ADR-0003 rule 1: no exception exists for a detector.
+
+    Anything under ``caguard/detect`` must work from the uploaded ledger alone.
+    Reaching into the benchmark would let a detector score against how the data
+    was planted rather than what the data shows.
+    """
+    tree = ast.parse(module.read_text(), filename=str(module))
+    offenders = {n for n in _imported_names(tree) if n.startswith(BENCHMARK_PACKAGE)}
+    assert not offenders, (
+        f"detect/{module.name} imports {sorted(offenders)}. Detection code must "
+        "derive everything from the ledger in front of it; there is no allowlist here."
+    )
+
+
+def test_detect_package_is_covered_once_it_exists() -> None:
+    """Fails loudly if the package is renamed and the strict rule silently stops applying."""
+    if (SRC / "runner.py").exists() or (SRC / "rules.py").exists():
+        pytest.fail("detection modules found outside caguard/detect; strict rule would not apply")
 
 
 def test_the_exception_list_stays_small() -> None:

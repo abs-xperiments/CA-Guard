@@ -9,6 +9,8 @@ cannot silently appear in ours.
 
 from __future__ import annotations
 
+from collections import Counter
+
 import pandas as pd
 import pytest
 
@@ -41,6 +43,22 @@ def vouchers(ledger: GeneratedLedger) -> pd.DataFrame:
     )
     view["hour"] = view.posted.dt.hour
     view["weekday"] = view.date.dt.dayofweek
+
+    # How often each voucher's least common account pairing occurs in the ledger.
+    lines = ledger.lines
+    pair_counts: Counter[tuple[str, str]] = Counter()
+    for _, group in lines.groupby("voucher_id", sort=False):
+        debited = sorted(set(group.loc[group.debit_paise > 0, "account_code"]))
+        credited = sorted(set(group.loc[group.credit_paise > 0, "account_code"]))
+        pair_counts.update((d, c) for d in debited for c in credited)
+
+    view["rarest_pair_count"] = [
+        min(
+            (count for pair, count in pair_counts.items() if set(pair) <= accounts),
+            default=999,
+        )
+        for accounts in view.accounts
+    ]
     return view
 
 
@@ -54,12 +72,18 @@ SURFACE_TESTS = {
     AnomalyKind.PERIOD_END_CONCENTRATION: lambda d: (
         (d.date.dt.month == 3) & (d.date.dt.day == 31) & d.doc.isna()
     ),
+    # Planted just under the limit. The band matches the generator's spread,
+    # which is deliberately wider than a few hundred rupees — nobody splitting a
+    # payment hugs the line to the last rupee.
     AnomalyKind.THRESHOLD_ADJACENT: lambda d: d.amount.between(
-        coa.APPROVAL_LIMIT_PAISE - 80_00, coa.APPROVAL_LIMIT_PAISE - 1
+        coa.APPROVAL_LIMIT_PAISE - 4_500_00, coa.APPROVAL_LIMIT_PAISE - 1
     ),
     AnomalyKind.MISSING_DOCUMENT_REF: lambda d: d.doc.isna(),
     AnomalyKind.POST_CLOSE_ENTRY: lambda d: d.post_close,
-    AnomalyKind.RARE_ACCOUNT_PAIR: lambda d: d.accounts.map(lambda s: {"5110", "1800"} <= s),
+    # Tests the observable property — this combination barely occurs — rather
+    # than a fixed list of accounts. The generator varies the pairing precisely
+    # so that no single combination becomes common.
+    AnomalyKind.RARE_ACCOUNT_PAIR: lambda d: d.rarest_pair_count <= 2,
     AnomalyKind.UNUSUAL_PREPARER_ACCOUNT: lambda d: d.apply(
         lambda r: (
             r.author in coa.PREPARER_SCOPE and not (r.accounts & coa.PREPARER_SCOPE[r.author])

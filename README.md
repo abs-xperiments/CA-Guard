@@ -21,10 +21,21 @@ Signal fusion itself is an engineering technique, not our novelty — commercial
 |---|---|
 | 0 — Research and decision gate | ✅ Complete (`docs/phase-plans/PHASE-0-RESEARCH-DECISION.md`) |
 | 1 — Foundation: schema, intake, benchmark generator | ✅ Complete |
-| 2 — Deterministic audit-review signals | Next |
-| 3–7 | Planned (`docs/11_IMPLEMENTATION_ROADMAP.md`) |
+| 2 — Deterministic audit-review signals | ✅ Complete |
+| 3 — Statistical + ML anomaly engine | Next |
+| 4–7 | Planned (`docs/11_IMPLEMENTATION_ROADMAP.md`) |
 
-No detection logic exists yet. Phase 1 built the substrate: the canonical schema, the ingestion path, and the benchmark.
+Ten deterministic signals now produce a review queue with structured evidence behind every finding. No scoring or fusion yet — signals stay independent so a reviewer sees *which* concern fired.
+
+### Phase 2 result (seeds 101–105, never used while developing the thresholds)
+
+| | |
+|---|---|
+| Per-signal recall | 100% on nine signals; 98% on `unusual_preparer_account` |
+| Decoy false positives | **0** on every trap, and 0 of 1,000 decoys reached the queue |
+| Queue size | 5.0% of vouchers, holding 100% of planted anomalies |
+
+Full table and frozen thresholds in `docs/adr/0004-frozen-signal-thresholds.md`.
 
 ## Quickstart
 
@@ -42,6 +53,7 @@ Generate a benchmark ledger and inspect a real corpus:
 uv run caguard generate --vouchers 4000        # ledger + ground truth + manifest
 uv run caguard columns  ledger.csv             # how do these headers map?
 uv run caguard ingest   ledger.csv             # convert and report data quality
+uv run caguard detect   ledger.csv             # run the signals, print the review queue
 
 make data                                       # fetch the VynFi corpus (~34 MB)
 uv run caguard ingest data/external/shard0.parquet --vynfi
@@ -68,9 +80,11 @@ src/caguard/
   schema.py           the canonical journal-entry schema
   intake/             readers, column mapping, validation
   adapters/vynfi.py   the SAP-shaped external corpus
+  detect/             the ten signals — provably cannot import benchmark/
+  evaluation/         plain set metrics: recall, false positives, precision@K
   benchmark/          the generator — importable by nothing else (ADR-0003)
   cli.py
-tests/                95 tests, including the benchmark-integrity guards
+tests/                205 tests, including the benchmark-integrity guards
 docs/                 the method: charter, research, ADRs, phase plans
 journal.md            the running record, in plain language
 ```

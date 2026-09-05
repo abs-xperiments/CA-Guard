@@ -16,3 +16,6 @@
 | D-012 | Money is stored as integer paise; the Pydantic contract exposes Decimal rupees. | Decided | Float rupees force a balance tolerance, and a tolerance is where a real imbalance hides. VynFi's own float amounts leave 599 vouchers unbalanced. |
 | D-013 | Generator/detector isolation is enforced by an AST test with a bounded allowlist, not by convention. | Decided | It caught a real violation on its first run. ADR-0003 rule 1. |
 | D-014 | Patent language stays cautious; evidence-gap prioritization remains a hypothesis, not a novelty claim, pending formal prior-art and claim analysis. | Decided (founder F-2/F-3) | CORAA's unpublished filing cannot be cleared by any search today. |
+| D-015 | A signal that cannot discriminate on a given ledger abstains rather than flagging everything. | Decided | `rare_account_pair` flagged 95% of VynFi; `off_hours_posting` would flag 100% of it. ADR-0004. |
+| D-016 | Detector thresholds frozen in ADR-0004 and reported only on held-out seeds 101-105. | Decided | ADR-0003 rule 4. Thresholds were developed against seed 20250906 over several iterations. |
+| D-017 | Signals stay independent in Phase 2; no fusion or scoring until Phase 4. | Decided | A reviewer must see which concern fired, not an opaque number. |

@@ -135,11 +135,12 @@ def _recurring_emi(b: _Builder) -> int:
 
 def _below_threshold(b: _Builder) -> int:
     """A real invoice that simply happens to fall under the limit — with evidence."""
-    amount = coa.APPROVAL_LIMIT_PAISE - b.rng.randint(100, 80_00)
+    amount = coa.APPROVAL_LIMIT_PAISE - b.rng.randint(100, 4_500_00)
+    day = b.working_day()
     b.add(
         voucher_type=VoucherType.PAYMENT,
-        voucher_date=b.working_day(),
-        posted_at=b.business_time(b.working_day()),
+        voucher_date=day,
+        posted_at=b.business_time(day),
         legs=[("2000", amount, 0), ("1010", 0, amount)],
         narration=f"Payment to {b.rng.choice(coa.VENDORS)} against invoice",
         document_ref=b.doc_ref("BP"),
