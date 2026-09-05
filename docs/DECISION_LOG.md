@@ -21,3 +21,6 @@
 | D-017 | Signals stay independent in Phase 2; no fusion or scoring until Phase 4. | Decided | A reviewer must see which concern fired, not an opaque number. |
 | D-018 | The generator models a ledger with an opening position and linked transaction cycles, not a stream of independent vouchers. | Decided | An internal CA review found the bank overdrawn by Rs 5.58 crore, fixed assets in credit and a year of unpaid TDS. docs/ca_validation/findings.md. |
 | D-019 | Balance-sheet coherence is enforced by tests that read the trial balance, not only per-voucher tests. | Decided | None of the Phase 1 tests could see a defect that only appears in aggregate. |
+| D-020 | Rules remain the primary detector. The model is retained but weighted low and must corroborate; it may not raise a voucher alone. | Decided | On held-out seeds it found 0 anomalies the rules missed and queued 30 legitimate vouchers. ADR-0005. |
+| D-021 | Benford's law is reported per account as a diagnostic, never as a per-voucher flag. | Decided | A single number has no distribution. |
+| D-022 | Phase 4 fusion is measured against rules-alone as the baseline to beat. | Decided | Adding signals that lower precision is not progress. |

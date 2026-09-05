@@ -39,6 +39,12 @@ class SignalKind(StrEnum):
     UNUSUAL_PREPARER_ACCOUNT = "unusual_preparer_account"
     POST_CLOSE_ENTRY = "post_close_entry"
 
+    # Statistical and model-derived. Kept in the same vocabulary so a reviewer
+    # sees one queue, but produced by separate layers (see the architecture:
+    # rules, statistics and ML run in parallel and are fused in Phase 4).
+    AMOUNT_OUTLIER = "amount_outlier"
+    ML_ANOMALY = "ml_anomaly"
+
 
 @dataclass(frozen=True)
 class SignalHit:
@@ -130,6 +136,20 @@ class DetectorConfig:
 
     #: A posting lag beyond this suggests the entry was made after the close.
     post_close_lag_days: int = 45
+
+    #: Robust deviation, in median-absolute-deviation units, beyond which an
+    #: amount is unusual for its account. Six is deliberately conservative: a
+    #: ledger has a handful of genuinely large entries every month.
+    amount_deviation_threshold: float = 6.0
+
+    #: Share of the ledger the model treats as outlying. Set from what a
+    #: reviewer can work through, never from the known planted rate — that would
+    #: be handing the model the answer.
+    model_contamination: float = 0.02
+
+    #: Minimum vouchers on an account before its Benford conformity means
+    #: anything. Below this the statistic is noise.
+    benford_min_sample: int = 100
 
     def __post_init__(self) -> None:
         if self.off_hours_start <= self.off_hours_end:

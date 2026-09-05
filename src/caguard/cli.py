@@ -166,5 +166,51 @@ def detect(
             typer.echo(f"      {hit.reason}")
 
 
+@app.command()
+def analyse(
+    path: Annotated[Path, typer.Argument(help="Ledger file (.csv/.xlsx/.parquet)")],
+    vynfi: Annotated[bool, typer.Option("--vynfi", help="Treat input as the VynFi corpus")] = False,
+) -> None:
+    """Run all three layers separately and report what each contributes.
+
+    Rules, statistics and the model are shown side by side rather than blended.
+    Combining them into one score is Phase 4; seeing them apart is what tells a
+    reviewer whether the model is earning its place on their data.
+    """
+    from caguard.adapters.vynfi import adapt
+    from caguard.detect.statistics import benford_by_account
+    from caguard.evaluation.baselines import build_approaches
+    from caguard.intake.readers import IntakeError, read_table
+
+    try:
+        frame = read_table(path)
+    except IntakeError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise typer.Exit(1) from exc
+
+    canonical = adapt(frame) if vynfi else frame
+    context, approaches = build_approaches(canonical)
+    total = len(context)
+
+    typer.echo(f"\n{total:,} vouchers\n")
+    typer.echo(f"  {'approach':20s} {'flagged':>9s} {'share':>8s}")
+    for name in ("rules", "statistics", "model", "all"):
+        found = approaches[name]
+        typer.echo(f"  {name:20s} {len(found):9,} {len(found) / total:8.1%}")
+
+    only_model = approaches["model"] - approaches["rules"]
+    typer.echo(
+        f"\n  The model flags {len(only_model):,} vouchers the rules do not. "
+        "On the project benchmark these are statistically unusual but legitimate; "
+        "on your data, check a sample before trusting them."
+    )
+
+    benford = [r for r in benford_by_account(context) if r.conformity == "non-conforming"]
+    if benford:
+        typer.echo("\n  Accounts not conforming to Benford's law:")
+        for result in benford[:5]:
+            typer.echo(f"    {result.summary()}")
+
+
 if __name__ == "__main__":
     app()

@@ -22,8 +22,9 @@ Signal fusion itself is an engineering technique, not our novelty — commercial
 | 0 — Research and decision gate | ✅ Complete (`docs/phase-plans/PHASE-0-RESEARCH-DECISION.md`) |
 | 1 — Foundation: schema, intake, benchmark generator | ✅ Complete |
 | 2 — Deterministic audit-review signals | ✅ Complete |
-| 3 — Statistical + ML anomaly engine | Next |
-| 4–7 | Planned (`docs/11_IMPLEMENTATION_ROADMAP.md`) |
+| 3 — Statistical + ML anomaly engine | ✅ Complete |
+| 4 — Risk fusion + evidence | Next |
+| 5–7 | Planned (`docs/11_IMPLEMENTATION_ROADMAP.md`) |
 
 Ten deterministic signals now produce a review queue with structured evidence behind every finding. No scoring or fusion yet — signals stay independent so a reviewer sees *which* concern fired.
 
@@ -36,6 +37,18 @@ Ten deterministic signals now produce a review queue with structured evidence be
 | Queue size | 5.0% of vouchers, holding 100% of planted anomalies |
 
 Full table and frozen thresholds in `docs/adr/0004-frozen-signal-thresholds.md`.
+
+### Phase 3 result — the model adds nothing here, and that is the finding
+
+| Approach | Recall | Precision | Legitimate entries wrongly queued |
+|---|---|---|---|
+| **rules** | **100%** | 34% | **0** |
+| model (Isolation Forest) | 51% | 51% | 30 |
+| all combined | 100% | 29% | 30 |
+
+The model surfaced **zero** anomalies the rules missed, on every held-out seed, and queued legitimate entries instead: auto-posted bank charges, rent that is round because a lease fixed it, documented year-end accruals. All statistically unusual; all entirely proper. What makes them legitimate is the lease, the mandate and the approval — none of which is in the numbers.
+
+**Statistical unusualness is not audit relevance.** That is the project's thesis and this is the first direct evidence for it. It is *not* a claim that ML is useless on real books — see `docs/adr/0005-ml-adds-nothing-on-this-benchmark.md` for the honest limits.
 
 ## Quickstart
 
@@ -54,6 +67,7 @@ uv run caguard generate --vouchers 4000        # ledger + ground truth + manifes
 uv run caguard columns  ledger.csv             # how do these headers map?
 uv run caguard ingest   ledger.csv             # convert and report data quality
 uv run caguard detect   ledger.csv             # run the signals, print the review queue
+uv run caguard analyse  ledger.csv             # rules vs statistics vs model, side by side
 
 make data                                       # fetch the VynFi corpus (~34 MB)
 uv run caguard ingest data/external/shard0.parquet --vynfi
@@ -80,11 +94,11 @@ src/caguard/
   schema.py           the canonical journal-entry schema
   intake/             readers, column mapping, validation
   adapters/vynfi.py   the SAP-shaped external corpus
-  detect/             the ten signals — provably cannot import benchmark/
-  evaluation/         plain set metrics: recall, false positives, precision@K
+  detect/             signals, statistics and the model — cannot import benchmark/
+  evaluation/         set metrics and the baseline comparison
   benchmark/          the generator — importable by nothing else (ADR-0003)
   cli.py
-tests/                205 tests, including the benchmark-integrity guards
+tests/                298 tests: integrity guards, ledger coherence, signal quality
 docs/                 the method: charter, research, ADRs, phase plans
 journal.md            the running record, in plain language
 ```

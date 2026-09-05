@@ -14,6 +14,7 @@ import pytest
 
 from caguard.detect import DetectorConfig, SignalKind, run_signals
 from caguard.detect.context import build_context
+from caguard.detect.rules import DETECTORS
 from caguard.detect.runner import count_by_kind, flagged_vouchers, group_by_voucher
 from caguard.schema import AccountGroup, TimeFidelity, VoucherType
 
@@ -266,7 +267,9 @@ def test_grouping_and_counting(ledger_frame: pd.DataFrame) -> None:
     hits = run_signals(ledger_frame)
     grouped = group_by_voucher(hits)
     assert sum(len(v) for v in grouped.values()) == len(hits)
-    assert set(count_by_kind(hits)) == set(SignalKind)
+    # The deterministic rules only; the statistical and model layers are
+    # separate producers (see the architecture) and are counted alongside.
+    assert set(count_by_kind(hits)) == set(DETECTORS)
 
 
 def test_empty_ledger_is_handled() -> None:

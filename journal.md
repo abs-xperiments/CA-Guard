@@ -213,3 +213,50 @@ The generator was rebuilt around a ledger rather than a stream of vouchers. It n
 **The external CA review is still open.** Everything above came from an internal review. A practitioner will still see things I did not, and three of the bugs I found were realism faults a practitioner would have spotted faster.
 
 **Next step:** Phase 3 — statistical and machine-learning detection.
+
+---
+
+## 2026-09-06 06:30 IST — [PHASE 3] We added machine learning. It made things worse, and that is the most useful result yet.
+
+**What happened:**
+Phase 3 added the two things the roadmap asked for: a statistical layer (Benford's law, and a robust test for amounts that are unusual *for their own account*) and a machine-learning model (an Isolation Forest). Then I compared them honestly against the rules from Phase 2.
+
+**The model lost.** On five ledgers it had never seen:
+
+| Approach | Found | Wasted effort | Legitimate entries wrongly flagged |
+|---|---|---|---|
+| **Rules** | **100%** | 66% of the queue | **0** |
+| Statistics | 10% | 15% | 0 |
+| Machine learning | 51% | 49% | **30** |
+| Everything combined | 100% | 71% | 30 |
+
+The model found **zero** irregularities the rules had missed — not on one ledger, on every single one. Adding it to the rules did not raise what we catch at all; it just made the queue longer and dirtier.
+
+**But look at *what* it flagged instead.** Across 1,000 legitimate entries planted as traps, the model wrongly queued:
+- **110 bank charges** auto-posted by the bank
+- **40 monthly rent payments** of exactly ₹2,00,000
+- **2 documented year-end accruals**
+
+Every one of those is genuinely statistically unusual. The rent is exactly round and repeats every month. Bank charges are tiny, carry no voucher, and are posted by a machine. A statistical model is *correct* to call them outliers — and it is wrong about all of them.
+
+**Why?** Because what makes them legitimate is the lease, the bank mandate and the approval signature. **None of that is in the numbers.** No amount of statistical sophistication can recover it, because the information simply is not there.
+
+This is the clearest evidence yet for what this project argues: **being unusual is not the same as being wrong.** A CA does not need software that finds odd numbers — the odd numbers are mostly fine. They need software that knows which odd numbers lack an explanation. That is an evidence question, not a statistics question.
+
+**Being fair to the model, though.** I want to be careful not to overclaim. Our test irregularities are *rule-shaped by construction* — I wrote both the rules and the things they look for, so the rules had every advantage. This is **not** proof that machine learning is useless on real books. The opposite argument is actually quite strong: on a real client ledger containing something nobody thought to write a rule for, a model that needs no rule could be exactly what finds it. We cannot test that until we have real data.
+
+So the model stays, weighted low, and it will not be allowed to raise a voucher on its own. Its honest job is finding what we did not think to look for. On our own benchmark that is nothing, because we only planted what we were looking for.
+
+I also left a **tripwire**: a test that fails the moment the model finds something the rules missed. If that ever goes red, the model has earned its place and I will rewrite this entry.
+
+**Benford's law** is reported per *account*, not per entry — asking whether a single number violates a distribution is meaningless. It correctly picked out the accounts where round-number irregularities were planted.
+
+**Tests/checks:** ruff clean, pyright 0 errors, **296 tests passing** plus the two full-corpus tests. Model scores are identical across runs, so any result can be re-checked.
+
+**Git commit:** see below.
+
+**Founder decision needed:** none.
+
+**Credentials needed:** none. Still ₹0.
+
+**Next step:** Phase 4 — combining the signals into a single review priority, with the evidence gap as a first-class input. The bar is set by this phase: rules alone give 100% recall with zero false alarms on legitimate entries. **Fusion has to beat that, not just match it.** If it cannot, I will say so.
