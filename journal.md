@@ -365,3 +365,55 @@ None of this is urgent. **CA-Guard is complete and usable right now without it.*
 **Credentials needed:** none. **Cost:** ₹0. Nothing downloaded, nothing purchased.
 
 **Next step:** Phase 6 — the interface. The ranked queue, the evidence drawer, and the reviewer's accept/reject/investigate decisions.
+
+---
+
+## 2026-09-06 09:30 IST — [PHASE 5 cont.] Model installed. It failed first, and the fix was the prompt — not a bigger model.
+
+**What happened:**
+You approved freeing memory, so I did, then installed and properly measured the local model.
+
+**What was eating the machine.** Docker Desktop was **reserving 4.1 GB of your 8 GB** — more than half the laptop — to run two containers called `playground-postgres` and `playground-neon-proxy`, up for forty hours and belonging to a different project entirely. That single reservation was why the machine had been swapping so badly. Quitting it, plus Spotify, Teams and RStudio, took swap from **7.51 GB down to 3.02 GB**.
+
+Everything I stopped is reversible in seconds. Docker restarts with `open -a Docker`, and the containers' data volume was never touched.
+
+**Then the model failed.** First real run: **29.6 seconds, and it returned nothing at all.** The fallback worked exactly as designed — the reviewer got CA-Guard's own wording and never saw a blank — but the model itself was useless.
+
+Rather than assume it was too small, I looked. Qwen3 *thinks before it answers* unless you tell it not to. It was spending its entire word budget reasoning privately — 1,409 characters of it — then hitting the ceiling mid-sentence, or producing nothing at all. There is nothing for it to reason about here: the finding is already decided, and its only job is to rewrite it.
+
+Turning reasoning off: **7.4 seconds and a complete answer. Four times faster.**
+
+**Then the real test — 20 findings, measured properly:**
+
+| | Passed the safety check | Invented numbers | Concerns mentioned | Length | Speed |
+|---|---|---|---|---|---|
+| **No model (CA-Guard's own wording)** | — | 0 | **100%** | 101 words | **instant** |
+| **Qwen3 1.7B** | **20 out of 20** | **0** | 93% | **76 words** | 6.3 seconds |
+
+**Every single explanation passed the safety check.** Not one invented figure, not one word claiming fraud or certainty, across all twenty.
+
+**The one weakness, and how it was fixed.** Coverage started at 86% — the model was quietly leaving concerns out, which matters because a reviewer only acts on what they're shown. Your instruction was explicit: fix the prompt before reaching for a bigger model. So I did, telling it plainly to mention every concern and leave nothing out:
+
+| | Before | After |
+|---|---|---|
+| Concerns mentioned | 86% | **93%** |
+| Length | 94 words | **76 words** |
+| Speed | 6.96s | **6.29s** |
+
+More complete, shorter *and* faster. **No bigger model was needed, and I am not proposing one.** You were right to insist on that order.
+
+**Which one should be the default?** I don't think the AI wins outright. It writes more naturally in a quarter fewer words. But CA-Guard's own wording mentions every concern, never errs, and appears instantly. Six seconds a finding is six minutes across a fifty-item queue. **So no model stays the default**, and generated prose is something a firm switches on if they want it.
+
+**Tests/checks:** ruff clean, pyright 0 errors, **392 tests passing** plus the two full-corpus tests. I added tests for everything the real model taught me — including one asserting the app still works with the model switched off, because installing one must not quietly make it a dependency.
+
+**Resource use, measured honestly:** 1.4 GB on disk. Between 4.8 and 9.9 seconds per explanation. Swap still climbs from 4.6 to 5.1 GB while it runs — this laptop *can* run the model, but not comfortably alongside much else. That's a fact about the hardware, not the design.
+
+**What the safety check still cannot catch.** It stops invented numbers and conclusive language. It cannot catch a *plausible but misleading description* of a real figure. That is the main residual risk, and it is a further reason the deterministic path stays the default.
+
+**Git commit:** see below.
+
+**Founder decision needed:** none.
+
+**Credentials needed:** none. **Cost: ₹0.** Ollama and Qwen3 are free — no account, no key, no card.
+
+**Next step:** Phase 6 — the interface. The ranked queue, the evidence drawer, and the reviewer's accept / reject / investigate decisions.

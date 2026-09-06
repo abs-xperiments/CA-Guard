@@ -29,6 +29,10 @@ DEFAULT_HOST = "http://127.0.0.1:11434"
 #: quantisation for this tag: roughly 1.4 GB resident.
 DEFAULT_MODEL = "qwen3:1.7b"
 
+#: Generous enough for five sentences with room to finish the last one. The
+#: guard rejects rambling separately, so this only guards against truncation.
+NUM_PREDICT = 500
+
 #: Hostnames that resolve to this machine.
 LOOPBACK_NAMES = frozenset({"localhost", "ip6-localhost"})
 
@@ -69,17 +73,29 @@ class OllamaProvider:
             "model": self.model,
             "messages": messages,
             "stream": False,
+            # Qwen3 reasons before answering unless told not to. Measured on this
+            # machine: with reasoning on it spent 1,409 characters thinking, hit
+            # the token cap and returned a truncated answer — or nothing at all —
+            # in 24.7s. With it off: a complete answer in 7.4s. There is nothing
+            # to reason about here; the findings are already decided.
+            "think": False,
             "options": {
                 "temperature": self.temperature,
                 "seed": 20250906,
-                "num_predict": 400,
+                "num_predict": NUM_PREDICT,
             },
         }
         payload = self._request("/api/chat", body, timeout=timeout)
-        content = payload.get("message", {}).get("content", "")
-        if not str(content).strip():
+        message = payload.get("message", {}) or {}
+        content = str(message.get("content", ""))
+
+        if not content.strip():
+            # Reasoning arrives in its own field on newer Ollama versions. If it
+            # is all we got, the model spent the budget thinking and said nothing.
+            if str(message.get("thinking", "")).strip():
+                raise ProviderError("the model produced only reasoning and no explanation")
             raise ProviderError("the model returned nothing")
-        return _strip_reasoning(str(content))
+        return _strip_reasoning(content)
 
     def _request(self, path: str, body: dict[str, Any] | None, *, timeout: float) -> dict[str, Any]:
         url = f"{self.host.rstrip('/')}{path}"

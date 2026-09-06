@@ -24,7 +24,7 @@ Signal fusion itself is an engineering technique, not our novelty — commercial
 | 2 — Deterministic audit-review signals | ✅ Complete |
 | 3 — Statistical + ML anomaly engine | ✅ Complete |
 | 4 — Risk fusion + evidence | ✅ Complete |
-| 5 — Local/private AI explanation | ✅ Architecture complete; model install blocked on RAM |
+| 5 — Local/private AI explanation | ✅ Complete (Qwen3 1.7B installed and evaluated) |
 | 6 — Product UI/UX | Next |
 | 7 | Planned (`docs/11_IMPLEMENTATION_ROADMAP.md`) |
 
@@ -101,7 +101,16 @@ Generated and downloaded data is never committed.
 
 The explanation layer **renders** a finding; it never produces one. The model sees only the finding's verified facts, and every generated sentence is checked before display — an invented number or a word like "fraudulent" causes the text to be discarded and CA-Guard's own wording shown instead. In testing, **0% of a deliberately hallucinating model's output reached the reviewer.**
 
-**The product is complete without any model.** `caguard explain` needs nothing installed; that is the default. A local model (Qwen3 1.7B via Ollama, loopback-enforced) is optional prose polish. See `docs/adr/0007-local-model-strategy.md`.
+**The product is complete without any model.** `caguard explain` needs nothing installed; that is the default.
+
+Measured over 20 findings with **Qwen3 1.7B Q4_K_M** running locally through Ollama:
+
+| | Guard-accepted | Factual consistency | Evidence coverage | Words | Latency |
+|---|---|---|---|---|---|
+| deterministic (no model) | — | 1.00 | **1.00** | 101 | **0.0s** |
+| qwen3:1.7b | **20/20** | 1.00 | 0.93 | **76** | 6.3s |
+
+The model reads more naturally in a quarter fewer words; the deterministic path is complete and instant. Neither is simply better, so no model is the default and prose is opt-in (`--model qwen3:1.7b`). See `docs/adr/0007-local-model-strategy.md`.
 
 ## Privacy
 

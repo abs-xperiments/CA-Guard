@@ -1,7 +1,7 @@
 # ADR-0007 — Local model strategy: architecture first, Qwen3 1.7B, and a hard memory gate
 
 - **Date:** 2026-09-06
-- **Status:** Accepted; model installation **blocked on available memory**
+- **Status:** Accepted; model installed and evaluated 2026-09-06
 - **Phase:** 5
 - **Founder direction:** build the architecture and tests before downloading anything; deterministic fallback is first-class; Qwen3 **1.7B** Q4_K_M, not 4B; no hosted inference, no cloud GPU, no containerised model as a substitute; ₹0 throughout.
 
@@ -46,31 +46,104 @@ The guard initially rejected **our own** deterministic text, because it displaye
 
 Determinism is pinned: `temperature=0.0`, fixed seed, `num_predict=400`. A `<think>` block, which Qwen3 may emit, is stripped before the guard sees the text — reasoning is working material, not an explanation.
 
-## 🔴 Installation is blocked, and why
+## Installation: unblocked, installed, measured
 
-Measured on this machine immediately after the tests went green:
+The founder approved freeing memory (quitting Docker Desktop and three
+background applications). **Docker Desktop was reserving 4.1 GB of the 8 GB
+machine** for two containers belonging to another project — more than half the
+memory, for something unrelated to CA-Guard.
+
+| | Before | After |
+|---|---|---|
+| Swap in use | 7.51 GB | **3.02 GB** |
+| Compressed | 2.89 GB | 2.21 GB |
+
+Ollama 0.33.3 and `qwen3:1.7b` (**Q4_K_M confirmed**, 1.4 GB) installed. Free, no
+account, no key. Total spend: ₹0.
+
+## The model needed fixing, and it was the prompt — not the size
+
+First real inference returned **nothing** after 29.6 seconds. Diagnosed rather
+than assumed, per founder instruction 9:
+
+| Setting | Time | Reasoning | Answer |
+|---|---|---|---|
+| default (reasoning on) | 24.7s | 1,409 chars | truncated, sometimes empty |
+| **`think: False`** | **7.4s** | none | complete |
+
+Qwen3 reasons before answering unless told not to. It was spending its whole
+token budget thinking and hitting the cap mid-sentence. There is nothing to
+reason about here — the finding is already decided — so reasoning is disabled.
+**Four times faster, and it works.**
+
+## Controlled evaluation — 20 findings, seed 101
+
+| | Model text used | Factual consistency | Evidence coverage | Unsupported claims | Words | Readability | Latency |
+|---|---|---|---|---|---|---|---|
+| **deterministic (no model)** | — | **1.00** | **1.00** | **0** | 101 | easy (10 w/s) | **0.0s** |
+| **qwen3:1.7b Q4_K_M** | **20/20** | **1.00** | 0.93 | **0** | **76** | easy (16 w/s) | 6.3s median |
+
+**Every one of the twenty explanations passed the guard.** No invented numbers,
+no conclusive language, on any finding.
+
+### The prompt closed the one gap
+
+Coverage started at 0.858 — the model was quietly omitting concerns, exactly the
+weakness the stub had predicted. Instruction 9 says fix the prompt before
+reaching for a bigger model. Tightening it to demand every concern be mentioned:
+
+| | Before | After |
+|---|---|---|
+| Evidence coverage | 0.858 | **0.925** |
+| Words | 94 | **76** |
+| Latency | 6.96s | **6.29s** |
+
+Shorter, faster **and** more complete. **No larger model was needed or proposed.**
+
+## How the two compare
+
+Neither is simply better.
+
+- **Deterministic** is complete (100% coverage), instant, and never wrong. It
+  reads slightly mechanically — one clause per concern, 101 words.
+- **Qwen3 1.7B** reads more naturally in a quarter fewer words, at 93% coverage
+  and about 6 seconds a finding. The 7% it drops is the cost of prose.
+
+For a reviewer working through fifty findings, six seconds each is six minutes
+of waiting. The default therefore stays **no model**, with generated prose as an
+option a firm turns on.
+
+## Resource use, measured
 
 | | |
 |---|---|
-| Total memory | 8.0 GB |
-| Effectively available | **1.42 GB** |
-| Compressed | 2.68 GB |
-| **Swap in use** | **6.87 GB of 8.0 GB** |
-| Qwen3 1.7B Q4_K_M needs | ~1.4 GB resident + ~0.5 GB context ≈ **2.0 GB** |
+| Model on disk | 1.4 GB |
+| Latency | 4.8s min · 6.3s median · 9.9s max |
+| Swap during a 20-finding run | 4.64 → 5.05 GB |
 
-The machine is already swapping heavily. Installing now would not merely be slow — it would make the **latency measurement meaningless**, because we would be timing page faults rather than inference, and it risks making the machine unusable while it runs.
+Swap still climbs during inference. This machine can run the model, but not
+comfortably alongside much else — which is a fact about the laptop, not the
+design.
 
-Founder instruction 12 says not to download until the machine has sufficient free RAM. It does not. **No download was made.**
+## Limitations
 
-## What happens when memory is available
-
-`make model-install` (three free commands, no account, no key), then the comparison harness re-runs unchanged and the results replace the stub rows above.
-
-If Qwen3 1.7B reads poorly, instruction 9 applies: **investigate the prompt and the facts first.** The 62% coverage figure from the faithful stub already points at where the problem is likely to be — prose that summarises drops concerns — and that is a prompt problem, not a parameter-count problem. A larger model is proposed only through a Founder Decision Gate.
+1. **Measured on one machine under memory pressure.** Latency would improve
+   materially with more RAM.
+2. **20 findings from one seed.** Enough to show the guard holds and the prompt
+   fix worked; not a broad quality study.
+3. **Coverage is measured by keyword matching**, which is approximate. It cannot
+   tell a mention from a good explanation.
+4. **English only.** No Hindi or regional-language output was tested.
+5. **The guard cannot catch a plausible-but-wrong *characterisation*** — only
+   invented numbers and conclusive language. A model that describes a real
+   figure misleadingly would pass. This is the main residual risk and the reason
+   the deterministic path remains the default.
 
 ## Consequences
 
-- The application is complete and shippable **today** with no model at all.
-- `caguard explain --model none` is the default and needs nothing installed.
+- The application is complete and shippable with **no model at all**, and that
+  remains the default: `caguard explain` needs nothing installed.
+- A local model is opt-in prose polish: `--model qwen3:1.7b`.
 - Any future provider must satisfy the same guard and the same loopback rule.
-- Nothing was spent. Nothing was downloaded.
+- Reasoning mode must stay off for any thinking-capable model.
+- **Nothing was spent.** Ollama and Qwen3 are free; no account, key or card.

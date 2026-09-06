@@ -410,3 +410,62 @@ def test_require_headroom_raises_rather_than_warning(monkeypatch: pytest.MonkeyP
     monkeypatch.setattr(memory, "measure", lambda: memory.MemoryStatus(8.0, 0.5, 3.0, 7.0))
     with pytest.raises(memory.InsufficientMemoryError, match="Not enough free memory"):
         memory.require_headroom()
+
+
+# --- what the real model taught us -------------------------------------------
+
+
+def test_adapter_disables_reasoning_mode() -> None:
+    """Qwen3 reasons before answering unless told not to.
+
+    Measured on an 8 GB machine: reasoning on spent 1,409 characters thinking,
+    hit the token cap and returned truncated text — or nothing — in 24.7s. Off:
+    a complete answer in 7.4s. There is nothing to reason about; the finding is
+    already decided.
+    """
+    import inspect
+
+    from caguard.explain import ollama
+
+    source = inspect.getsource(ollama.OllamaProvider.generate)
+    assert '"think": False' in source
+
+
+def test_adapter_reports_a_reasoning_only_response_clearly() -> None:
+    """A model that spends its whole budget thinking must fail loudly, not blankly."""
+    import json
+    from unittest.mock import patch
+
+    from caguard.explain.ollama import OllamaProvider
+
+    provider = OllamaProvider()
+    reply = {"message": {"content": "", "thinking": "hmm, let me consider..."}}
+    with (
+        patch.object(provider, "_request", return_value=json.loads(json.dumps(reply))),
+        pytest.raises(ProviderError, match="only reasoning"),
+    ):
+        provider.generate([], timeout=5.0)
+
+
+def test_prompt_insists_on_covering_every_concern() -> None:
+    """Coverage was the model's one measured weakness, and the prompt fixed it.
+
+    Instruction: fix the prompt before reaching for a larger model. Tightening
+    this took coverage from 0.858 to 0.925 while making the text shorter and
+    faster.
+    """
+    assert "EVERY concern" in SYSTEM_PROMPT
+    assert "Do not leave any out" in SYSTEM_PROMPT
+
+
+def test_application_works_with_the_model_switched_off(findings: list[Finding]) -> None:
+    """The hard requirement, asserted after a real model was installed.
+
+    Installing one must not have made it a dependency.
+    """
+    service = ExplanationService(NullProvider())
+    for finding in findings[:5]:
+        result = service.explain(finding)
+        assert result.text.strip()
+        assert result.source is Source.DETERMINISTIC
+        assert result.latency_seconds == 0.0

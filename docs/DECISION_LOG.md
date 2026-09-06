@@ -32,3 +32,6 @@
 | D-028 | First local model is Qwen3 1.7B Q4_K_M, not 4B. Larger models only via a Founder Decision Gate. | Decided (founder) | 8 GB machine. Prompt design is investigated before parameter count. |
 | D-029 | The Ollama adapter refuses non-loopback hosts at construction. | Decided | Client data must never leave the machine; a config mistake must fail closed. |
 | D-030 | Model installation is gated on measured free memory and swap pressure. | Decided (founder instr. 12) | Downloading onto a swapping machine measures page faults, not inference. |
+| D-031 | Reasoning mode is disabled for thinking-capable models. | Decided | Qwen3 spent its whole token budget reasoning: 24.7s and truncated or empty output, versus 7.4s and complete with it off. |
+| D-032 | No model remains the default; generated prose is opt-in. | Decided | 6.3s per finding is ~6 minutes across a 50-item queue, for 93% coverage against the deterministic 100%. |
+| D-033 | Qwen3 1.7B Q4_K_M is sufficient; no larger model proposed. | Decided | The one weakness (coverage 0.858) was fixed by the prompt, reaching 0.925 while getting shorter and faster. Founder instruction 9 upheld. |

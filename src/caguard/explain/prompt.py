@@ -31,9 +31,13 @@ Rules, all of them absolute:
    kind. These are observations for a professional to review, nothing more.
 3. Never conclude. Do not say anything is proven, certain, or must be the case.
 4. Do not recommend an action, an adjustment or a disallowance.
-5. Write 3 to 5 sentences of plain British English. No lists, no headings, no
-   markdown.
-6. Lead with the concern that contributed most.
+5. Mention EVERY concern in the list. Do not leave any out, and do not merge
+   two into one. A reviewer acts on what you mention; anything you omit is
+   invisible to them.
+6. Write plain British English, one sentence per concern plus a short opening.
+   No lists, no headings, no markdown.
+7. Lead with the concern that contributed most.
+8. Keep sentences short. A reader working through fifty of these wants brevity.
 
 You are rewriting findings, not making them. The software decided what matters;
 you are making it readable."""

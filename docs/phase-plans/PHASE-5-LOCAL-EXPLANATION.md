@@ -57,7 +57,7 @@ Model size is the last thing to change, and only through a Founder Decision Gate
 | `test_ollama_refuses_non_loopback` | a remote host is rejected outright |
 | `test_no_network_without_a_provider` | the null path opens no socket |
 
-## Acceptance criteria — **architecture met; model install blocked on memory**
+## Acceptance criteria — **all met, 2026-09-06**
 
 - [x] Deterministic explanation implemented and good enough to ship alone
 - [x] Model receives only `structured_facts()`
@@ -66,7 +66,7 @@ Model size is the last thing to change, and only through a Founder Decision Gate
 - [x] Ollama adapter tested against a stub, loopback enforced
 - [x] **Application fully functional with no model installed**
 - [x] ruff / pyright / pytest green
-- [x] *Then* check free memory — **checked, and insufficient. Nothing downloaded.**
+- [x] *Then* check free memory; if sufficient, install Ollama + Qwen3 1.7B Q4_K_M
 - [x] Controlled comparison: factual consistency, evidence coverage, unsupported claims, readability, latency
 - [x] Model decision, results, resource use and limits recorded in `journal.md`
 
@@ -96,15 +96,33 @@ Architecture complete, **388 tests passing**, ruff and pyright clean. Full recor
 ### One correction the tests caught
 The guard rejected **our own** text for showing a priority of `0.986722` as `0.99`. Rounding for a reader is faithful rendering, not invention. Found by a test asserting the always-on path satisfies its own guard — if our template cannot pass, the guard is wrong.
 
-### 🔴 Model install blocked
+### Model installed and measured
 
-| | |
-|---|---|
-| Total memory | 8.0 GB |
-| Effectively available | **~1.4–2.0 GB** |
-| **Swap in use** | **6.9–7.8 GB of 8.0 GB** |
-| Qwen3 1.7B Q4_K_M needs | ~2.0–2.5 GB |
+Founder approved freeing memory. **Docker Desktop was reserving 4.1 GB of the 8 GB machine** for two containers belonging to another project. Quitting it plus three background apps took swap from **7.51 GB to 3.02 GB**.
 
-Per founder instruction 12, **nothing was downloaded**. Installing onto a swapping machine would make the latency measurement meaningless — timing page faults, not inference.
+Ollama 0.33.3 + `qwen3:1.7b` (Q4_K_M, 1.4 GB) installed. Free, no account, ₹0.
 
-`make model-check` reports the position; `make model-install` runs the gate and refuses if the machine still cannot take it.
+**First inference returned nothing after 29.6s.** Diagnosed, not guessed: Qwen3 reasons before answering unless told otherwise, and was spending its whole token budget thinking. With reasoning disabled: **7.4s and a complete answer** — four times faster.
+
+### Controlled evaluation, 20 findings
+
+| | Guard-accepted | Factual consistency | Evidence coverage | Unsupported claims | Words | Latency |
+|---|---|---|---|---|---|---|
+| **deterministic** | — | **1.00** | **1.00** | **0** | 101 | **0.0s** |
+| **qwen3:1.7b Q4_K_M** | **20/20** | **1.00** | 0.93 | **0** | **76** | 6.3s |
+
+**All twenty passed the guard.** No invented numbers, no conclusive language.
+
+### The prompt was the lever, not the model size
+
+Coverage started at 0.858 — the model was quietly dropping concerns. Per founder instruction 9, the prompt was fixed first:
+
+| | Before | After |
+|---|---|---|
+| Evidence coverage | 0.858 | **0.925** |
+| Words | 94 | **76** |
+| Latency | 6.96s | **6.29s** |
+
+Shorter, faster and more complete. **No larger model was needed or proposed.**
+
+The default remains **no model** — six seconds a finding is six minutes across fifty. Generated prose is an option a firm turns on.
