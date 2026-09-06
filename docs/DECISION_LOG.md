@@ -35,3 +35,8 @@
 | D-031 | Reasoning mode is disabled for thinking-capable models. | Decided | Qwen3 spent its whole token budget reasoning: 24.7s and truncated or empty output, versus 7.4s and complete with it off. |
 | D-032 | No model remains the default; generated prose is opt-in. | Decided | 6.3s per finding is ~6 minutes across a 50-item queue, for 93% coverage against the deterministic 100%. |
 | D-033 | Qwen3 1.7B Q4_K_M is sufficient; no larger model proposed. | Decided | The one weakness (coverage 0.858) was fixed by the prompt, reaching 0.925 while getting shorter and faster. Founder instruction 9 upheld. |
+| D-034 | Review decisions are append-only; the trail is never edited or deleted. | Decided | A record that can be changed is not a review record. Enforced by a test that reads the source. |
+| D-035 | Rejecting a finding requires a reason of at least three words. | Decided | Accepting says "I looked"; rejecting is the judgement someone will later question. |
+| D-036 | Findings are recomputed, never stored; the engagement stores the ledger hash instead. | Decided | A stored copy would drift from what the code now says, and nobody would know which was right. |
+| D-037 | The workspace is keyboard-first, and rejection is deliberately not a bare keystroke. | Decided | A CA working a long queue should not need the mouse, but a dismissal needs a typed reason. |
+| D-038 | The UI derives its counters from the findings on screen, not from a server snapshot. | Decided | The snapshot never updated as decisions were recorded, so the progress bar was a lie. |

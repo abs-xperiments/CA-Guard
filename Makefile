@@ -49,6 +49,15 @@ model-check:  ## Report whether this machine can run the local model right now
 generate:  ## Generate the seeded Indian benchmark ledger
 	uv run caguard generate
 
+web-install:  ## Install the workspace UI dependencies (free, no accounts)
+	cd web && npm install
+
+web:  ## Build and run the workspace UI (needs `make serve` in another terminal)
+	cd web && npm run build && npm run start
+
+serve:  ## Run the local API on 127.0.0.1:8000
+	uv run caguard serve
+
 clean:  ## Remove caches and generated data
 	rm -rf .pytest_cache .ruff_cache data/generated
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +

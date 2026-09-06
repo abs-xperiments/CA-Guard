@@ -25,8 +25,10 @@ Signal fusion itself is an engineering technique, not our novelty — commercial
 | 3 — Statistical + ML anomaly engine | ✅ Complete |
 | 4 — Risk fusion + evidence | ✅ Complete |
 | 5 — Local/private AI explanation | ✅ Complete (Qwen3 1.7B installed and evaluated) |
-| 6 — Product UI/UX | Next |
-| 7 | Planned (`docs/11_IMPLEMENTATION_ROADMAP.md`) |
+| 6 — Review workspace (decisions, API, UI) | ✅ Complete |
+| 7 — Evaluation, hardening, deployment | Next |
+| 6 — Review workspace (decisions, API, UI) | ✅ Complete |
+
 
 Ten deterministic signals now produce a review queue with structured evidence behind every finding. No scoring or fusion yet — signals stay independent so a reviewer sees *which* concern fired.
 
@@ -83,6 +85,8 @@ uv run caguard detect   ledger.csv             # run the signals, print the revi
 uv run caguard analyse  ledger.csv             # rules vs statistics vs model, side by side
 uv run caguard review   ledger.csv             # the prioritised review queue
 uv run caguard explain  ledger.csv             # plain-language explanations (no model needed)
+uv run caguard serve                           # the local API on 127.0.0.1:8000
+make web-install && make web                   # the review workspace at :3000
 
 make data                                       # fetch the VynFi corpus (~34 MB)
 uv run caguard ingest data/external/shard0.parquet --vynfi
@@ -127,10 +131,12 @@ src/caguard/
   detect/             signals, statistics and the model — cannot import benchmark/
   review/             evidence scoring, findings, transparent fusion
   explain/            deterministic prose, grounding guard, local model adapter
+  api/                the local HTTP API, loopback-bound
   evaluation/         set metrics, baseline comparison, ablation
   benchmark/          the generator — importable by nothing else (ADR-0003)
   cli.py
 tests/                390 tests: integrity guards, coherence, signal quality, ranking, grounding
+web/                  the review workspace (Next.js 16, Tailwind v4, owned components)
 docs/                 the method: charter, research, ADRs, phase plans
 journal.md            the running record, in plain language
 ```

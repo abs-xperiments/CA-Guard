@@ -206,3 +206,24 @@ def test_comparison_frame_reports_every_approach(ledger_101: GeneratedLedger) ->
         "precision",
         "decoys_queued",
     }
+
+
+def test_model_reasons_avoid_developer_language(ctx) -> None:
+    """A reviewer must never be shown a variable name.
+
+    "the largest differences are in has_evidence, evidence_coverage" means
+    something to us and nothing to a CA, and a finding that reads like a
+    variable dump undermines everything around it.
+    """
+
+    for hit in detect_ml_anomaly(ctx, CFG):
+        for raw in FEATURE_NAMES:
+            assert raw not in hit.reason, f"{raw!r} leaked into: {hit.reason}"
+        assert "_" not in hit.reason.replace("CA-Guard", "")
+
+
+def test_every_feature_has_a_readable_name() -> None:
+    from caguard.detect.model import FEATURE_LABELS, describe_feature
+
+    assert set(FEATURE_LABELS) == set(FEATURE_NAMES)
+    assert describe_feature("unknown_thing") == "unknown thing"

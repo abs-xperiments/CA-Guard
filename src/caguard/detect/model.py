@@ -37,6 +37,35 @@ N_ESTIMATORS = 200
 #: How many features to name when explaining why a voucher scored as it did.
 TOP_FEATURES = 3
 
+#: What each feature is called in a reviewer's language. `evidence_coverage`
+#: means something to us and nothing to a CA, and a finding that reads like a
+#: variable dump undermines the rest of the explanation.
+FEATURE_LABELS: dict[str, str] = {
+    "log_amount": "the size of the amount",
+    "line_count": "the number of lines",
+    "first_digit": "the leading digit of the amount",
+    "trailing_zeros": "how round the amount is",
+    "is_round_thousand": "the amount being a round figure",
+    "posting_hour": "the time of day it was entered",
+    "has_posting_time": "whether a posting time was recorded",
+    "day_of_week": "the day of the week",
+    "days_to_year_end": "how close it falls to the year end",
+    "posting_lag_days": "the delay between its date and its entry",
+    "is_manual": "it being a manual entry",
+    "is_post_close": "it being entered after the close",
+    "has_evidence": "the absence of a supporting document",
+    "evidence_coverage": "how few of its lines are documented",
+    "has_approver": "whether it was approved",
+    "account_pair_rarity": "how rarely these accounts appear together",
+    "preparer_familiarity": "how rarely this preparer uses these accounts",
+    "amount_deviation": "how far the amount sits from others on the account",
+}
+
+
+def describe_feature(name: str) -> str:
+    """A reviewer-readable name for a feature."""
+    return FEATURE_LABELS.get(name, name.replace("_", " "))
+
 
 @dataclass(frozen=True)
 class ModelResult:
@@ -104,15 +133,20 @@ def detect_ml_anomaly(ctx: LedgerContext, config: DetectorConfig | None = None) 
             continue
         row = standardised.loc[voucher_id]
         drivers = row.nlargest(TOP_FEATURES)
-        named = ", ".join(str(name) for name in drivers.index)
+        described = [describe_feature(str(name)) for name in drivers.index]
+        named = (
+            ", ".join(described[:-1]) + f" and {described[-1]}"
+            if len(described) > 1
+            else described[0]
+        )
         hits.append(
             SignalHit(
                 voucher_id=str(voucher_id),
                 kind=SignalKind.ML_ANOMALY,
                 strength=float(min(1.0, max(0.0, (score - threshold) / max(threshold, 1e-9)))),
                 reason=(
-                    f"Statistically unusual against the rest of this ledger; "
-                    f"the largest differences are in {named}."
+                    "Statistically unusual against the rest of this ledger, "
+                    f"mostly because of {named}."
                 ),
                 evidence={
                     "model_version": result.version,

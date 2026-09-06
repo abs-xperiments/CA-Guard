@@ -65,16 +65,42 @@ Explanations come from the deterministic path unless a firm turns a model on. Th
 | `test_api_happy_path` | upload → analyse → findings → decision → export |
 | `test_api_works_without_a_model` | explanations are still returned, from the deterministic path |
 
-## Acceptance criteria
+## Acceptance criteria — **all met, 2026-09-07**
 
-- [ ] Decisions recorded with an append-only audit trail
-- [ ] Rejection requires a reason
-- [ ] Engagement stores the ledger's content hash
-- [ ] Report export covers every reviewed finding
-- [ ] API loopback-bound; full happy path works
-- [ ] Workspace: queue, filters, evidence drawer, decision actions, empty/loading/error states, keyboard navigation
-- [ ] Everything works with no model installed
-- [ ] ruff / pyright / pytest green; docs, journal, clean commit
+- [x] Decisions recorded with an append-only audit trail
+- [x] Rejection requires a reason
+- [x] Engagement stores the ledger's content hash
+- [x] Report export covers every reviewed finding
+- [x] API loopback-bound; full happy path works
+- [x] Workspace: queue, filters, evidence drawer, decision actions, empty/loading/error states, keyboard navigation
+- [x] Everything works with no model installed
+- [x] ruff / pyright / pytest green; docs, journal, clean commit
 
 ## Out of scope
 Deployment, Docker, Railway (Phase 7). Multi-user accounts and permissions — a single reviewer on one machine is the product being built.
+
+---
+
+## Outcome (2026-09-07)
+
+A CA can open a ledger, work a ranked queue, inspect the evidence, record a decision and export a report — verified end to end in a real browser, not only in tests.
+
+### What was built
+- **Review trail** — append-only SQLite. Rejection requires a reason of at least three words; a test reads the source and fails if an `UPDATE` or `DELETE` against the trail ever appears.
+- **API** — FastAPI, loopback-bound, refusing any other address with a message naming the rule broken.
+- **Workspace** — Next.js 16, Tailwind v4, components owned in-repo. Ranked queue, filters, evidence drawer, decision actions, empty/loading/error states, full keyboard navigation (`j`/`k`/`Enter`/`a`/`i`/`Esc`).
+- **Report** — CSV and a self-contained HTML file with no external styles, fonts or scripts, so it survives being emailed into a working-paper file.
+
+### Three real bugs found by using it rather than testing it
+
+1. **A CSV upload crashed the detectors.** Files read as text, so `debit_paise > 0` failed deep inside the pipeline with a message that told a reviewer nothing. Type coercion now happens once, in intake — and blank is treated as *absent*, not as an empty string, because an empty document reference is the evidence gap this product is built around.
+2. **The ledger fingerprint was not row-order stable.** It sorted on the first two alphabetical columns, which contain ties.
+3. **The progress counter never moved.** The header read a server snapshot while decisions updated the findings list, so a reviewer working through the queue saw "0 of 49" indefinitely. Counts are now derived from what is on screen.
+
+### And one the screenshots caught
+The ML signal was showing a CA `has_evidence, evidence_coverage, is_manual`. Developer language in a reviewer's finding undermines everything around it. Every feature now has a readable name, asserted by a test.
+
+### Deliberate choices worth recording
+- **Evidence before prose.** The drawer shows signals, evidence and source lines first; the written explanation sits below, labelled with who wrote it. A reviewer should reach their own view before reading one.
+- **Reject is not a bare keystroke.** `a` and `i` work from the queue; rejecting needs a reason, and the reason belongs in the drawer where it can be typed.
+- **"Not required" is not "missing".** An approval below the delegation limit was never expected, and saying so is the difference between a useful queue and noise.

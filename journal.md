@@ -417,3 +417,44 @@ More complete, shorter *and* faster. **No bigger model was needed, and I am not 
 **Credentials needed:** none. **Cost: ₹0.** Ollama and Qwen3 are free — no account, no key, no card.
 
 **Next step:** Phase 6 — the interface. The ranked queue, the evidence drawer, and the reviewer's accept / reject / investigate decisions.
+
+---
+
+## 2026-09-07 — [PHASE 6] The workspace. A CA can now actually use this.
+
+**What happened:**
+Everything before now produced a good answer that only existed on a command line. Phase 6 is where it becomes something a Chartered Accountant can sit down in front of.
+
+**The screen.** A ranked queue on the left, the evidence behind whatever is selected on the right. The highest-risk entries are at the top, each with the reasons in plain English — "No supporting document", "Year-end adjustment", "Posted after close" — a small bar showing how complete the evidence trail is, and the current review status. Amounts in proper lakh and crore grouping, dates as dd-mm-yyyy.
+
+Open a finding and you get, in this order: **why it was flagged** (each concern with how much it contributed), **the evidence trail** (document, approval, narration — present, missing, or *not required*), **the exact ledger lines** it came from, and only then a written explanation. That order is deliberate. A reviewer should reach their own view from the facts before reading prose written for them.
+
+Then they accept, reject, or mark it for investigation.
+
+**Rejecting requires a reason.** Accepting a finding just says "I looked at this". Rejecting says "this is not a concern" — and that is the judgement someone will question six months later when nobody remembers the invoice. So the Reject button stays disabled until a reason is typed, and the interface says why before you click rather than after.
+
+**Nothing is ever edited or deleted.** Every decision is a new entry. If a reviewer changes their mind, both views are kept — that sequence is often more useful than the final answer. There is a test that reads the code itself and fails the build if anyone ever adds an instruction that could overwrite the trail.
+
+**It is built for the keyboard.** `j` and `k` to move, Enter to open, `a` to accept, `i` to investigate, Esc to close. Somebody working through a hundred findings should not have to keep reaching for the mouse. Rejecting is deliberately *not* a bare keystroke, because it needs that typed reason.
+
+**Three real bugs I only found by using it, not by testing it:**
+
+1. **Uploading a CSV crashed the whole analysis.** Files are read as text, so the amount columns were strings, and the comparison failed deep inside the detection code with an error meaning nothing to anyone. Fixed properly — types are restored once, at the point data comes in. And crucially: a blank cell now means *absent*, not "empty text". An empty document reference is the evidence gap this entire product is built around; treating it as a value would have quietly erased it.
+
+2. **The progress counter never moved.** You could review a dozen findings and the header would still say "0 of 49", because it was reading a snapshot from when the page loaded. A progress bar that does not move is worse than no progress bar.
+
+3. **The ledger fingerprint was unstable.** It sorted rows by the first two columns alphabetically, which contain repeats — so the same ledger could produce two different fingerprints depending on the order it happened to arrive in.
+
+**And one the screenshots caught.** The statistical signal was telling a CA the finding was unusual "because of has_evidence, evidence_coverage, is_manual". That is our variable names leaking onto their screen, and it makes everything around it look unfinished. It now says "mostly because of the absence of a supporting document, how few of its lines are documented and it being a manual entry."
+
+**A small thing I am pleased with.** Where an approval was never required — because the amount was below the firm's limit — the screen says **"not required"**, not "missing". That distinction is the difference between a queue a CA trusts and one they abandon.
+
+**Tests/checks:** ruff clean, pyright 0 errors, **442 tests passing**. The interface was also driven end to end in a real browser: uploaded a ledger, opened a finding, generated an explanation, rejected one with a reason, accepted the next by keyboard, and watched the counter go 0 → 1 → 2 of 49.
+
+**Git commit:** see below.
+
+**Founder decision needed:** none.
+
+**Credentials needed:** none. **Cost: ₹0.** Next.js, Tailwind and the icons are all free and open source, and the components are written into the repository rather than pulled from a paid library.
+
+**Next step:** Phase 7 — the last one. Benchmark runner, security checks, the Docker self-hosted path, and the deployment story. That is where the Railway question comes back, and where I will need a decision from you about whether to deploy publicly at all.
