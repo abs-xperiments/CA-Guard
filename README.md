@@ -24,8 +24,9 @@ Signal fusion itself is an engineering technique, not our novelty — commercial
 | 2 — Deterministic audit-review signals | ✅ Complete |
 | 3 — Statistical + ML anomaly engine | ✅ Complete |
 | 4 — Risk fusion + evidence | ✅ Complete |
-| 5 — Local/private AI explanation | Next |
-| 6–7 | Planned (`docs/11_IMPLEMENTATION_ROADMAP.md`) |
+| 5 — Local/private AI explanation | ✅ Architecture complete; model install blocked on RAM |
+| 6 — Product UI/UX | Next |
+| 7 | Planned (`docs/11_IMPLEMENTATION_ROADMAP.md`) |
 
 Ten deterministic signals now produce a review queue with structured evidence behind every finding. No scoring or fusion yet — signals stay independent so a reviewer sees *which* concern fired.
 
@@ -81,6 +82,7 @@ uv run caguard ingest   ledger.csv             # convert and report data quality
 uv run caguard detect   ledger.csv             # run the signals, print the review queue
 uv run caguard analyse  ledger.csv             # rules vs statistics vs model, side by side
 uv run caguard review   ledger.csv             # the prioritised review queue
+uv run caguard explain  ledger.csv             # plain-language explanations (no model needed)
 
 make data                                       # fetch the VynFi corpus (~34 MB)
 uv run caguard ingest data/external/shard0.parquet --vynfi
@@ -94,6 +96,12 @@ Two datasets, with deliberately different jobs (`data/SOURCES.md`, `docs/adr/000
 - **The project's own seeded Indian ledger** — the sole accuracy benchmark. Reproducible from a fixed seed, with ground truth written to a separate file that no detector may read, and with legitimate look-alike "decoys" that a careless detector will wrongly flag.
 
 Generated and downloaded data is never committed.
+
+### Phase 5 — explanations that cannot invent
+
+The explanation layer **renders** a finding; it never produces one. The model sees only the finding's verified facts, and every generated sentence is checked before display — an invented number or a word like "fraudulent" causes the text to be discarded and CA-Guard's own wording shown instead. In testing, **0% of a deliberately hallucinating model's output reached the reviewer.**
+
+**The product is complete without any model.** `caguard explain` needs nothing installed; that is the default. A local model (Qwen3 1.7B via Ollama, loopback-enforced) is optional prose polish. See `docs/adr/0007-local-model-strategy.md`.
 
 ## Privacy
 
@@ -109,10 +117,11 @@ src/caguard/
   adapters/vynfi.py   the SAP-shaped external corpus
   detect/             signals, statistics and the model — cannot import benchmark/
   review/             evidence scoring, findings, transparent fusion
+  explain/            deterministic prose, grounding guard, local model adapter
   evaluation/         set metrics, baseline comparison, ablation
   benchmark/          the generator — importable by nothing else (ADR-0003)
   cli.py
-tests/                328 tests: integrity guards, ledger coherence, signal quality, ranking
+tests/                390 tests: integrity guards, coherence, signal quality, ranking, grounding
 docs/                 the method: charter, research, ADRs, phase plans
 journal.md            the running record, in plain language
 ```

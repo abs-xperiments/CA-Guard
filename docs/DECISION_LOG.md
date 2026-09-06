@@ -27,3 +27,8 @@
 | D-023 | Priority is fused with noisy-OR, not a weighted sum, and every finding carries its per-signal contributions. | Decided | A sum lets weak concerns outvote a decisive one and exceeds 1 meaninglessly. ADR-0006. |
 | D-024 | Evidence availability is used as a detection signal, with the score uplift retained but recognised as near-redundant. | Decided | Removing evidence entirely costs 30pp at p@10; the uplift alone adds 1.6pp at p@50. ADR-0006. |
 | D-025 | Phase 4 is judged on ordering, not recall. | Decided | Rules already reached 100% recall in Phase 2. Ranking took p@25 from 34% to 100%. |
+| D-026 | The LLM renders an already-computed Finding. It never detects, ranks, or concludes. | Decided (founder) | The queue is identical with the model absent, broken or rejected. ADR-0007. |
+| D-027 | Generated text is discarded if any number is untraceable or any conclusive phrase appears. No retry. | Decided | A fabricated figure reads exactly like a real one. 0% of a hallucinating stub reached a reviewer. |
+| D-028 | First local model is Qwen3 1.7B Q4_K_M, not 4B. Larger models only via a Founder Decision Gate. | Decided (founder) | 8 GB machine. Prompt design is investigated before parameter count. |
+| D-029 | The Ollama adapter refuses non-loopback hosts at construction. | Decided | Client data must never leave the machine; a config mistake must fail closed. |
+| D-030 | Model installation is gated on measured free memory and swap pressure. | Decided (founder instr. 12) | Downloading onto a swapping machine measures page faults, not inference. |

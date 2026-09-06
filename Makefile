@@ -35,6 +35,17 @@ data:  ## Download the VynFi corpus (Apache-2.0, ~34 MB, never committed)
 	done
 	@ls -lh data/external/
 
+model-install:  ## Install Ollama + Qwen3 1.7B (free, local, ~1.4 GB). Needs ~2 GB free RAM.
+	@echo "Checking available memory before downloading anything..."
+	@uv run python -c "import sys;sys.path.insert(0,'src');from caguard.explain.memory import require_headroom;require_headroom()"
+	brew install ollama
+	brew services start ollama
+	ollama pull qwen3:1.7b
+	@echo "Done. Try: uv run caguard explain data/generated/*.parquet --model qwen3:1.7b"
+
+model-check:  ## Report whether this machine can run the local model right now
+	@uv run python -c "import sys;sys.path.insert(0,'src');from caguard.explain.memory import report;print(report())"
+
 generate:  ## Generate the seeded Indian benchmark ledger
 	uv run caguard generate
 

@@ -304,3 +304,64 @@ That completeness is also deliberate groundwork. In Phase 5 the local AI model w
 **Credentials needed:** none. Still ₹0.
 
 **Next step:** Phase 5 — the local, private AI explanation. This is the first phase that needs a model on this machine, which means installing Ollama (free, no account, no key) and a small model that fits in 8 GB. The rule is absolute: it explains the structured finding and nothing else, and detection keeps working with the model switched off entirely.
+
+---
+
+## 2026-09-06 08:40 IST — [PHASE 5] The explanation layer is built and cannot lie. The model is not installed, and should not be yet.
+
+**What happened:**
+Phase 5 is the part where an AI model finally appears in CA-Guard — and the whole design is about keeping it in its place. You set the rule and I've built to it exactly: **the model rewrites a finding that has already been decided.** It does not detect anything, does not rank anything, and is never allowed to reach a conclusion.
+
+Everything was built and tested before anything was downloaded, in the order you asked for.
+
+**The version with no AI at all is a real product, not a fallback.** This is what a firm sees if they never install a model, and what every reviewer sees whenever the model's output is rejected. It reads like this:
+
+> Voucher V004000 for ₹74,773.39, dated 31-03-2025, warrants attention first (priority 0.99).
+> Four concerns were raised on this voucher. The strongest is this: Manual entry of ₹74,773.39 with no supporting document reference on any of its 2 lines. Alongside it: Manual entry dated 31-03-2025, at the year end, with no supporting document and no approval...
+> The evidence trail is 15% complete. No supporting document and no approval.
+> Drawn from ledger lines V004000-01, V004000-02.
+> *This is a prioritised observation for review, not a conclusion.*
+
+**The model can only see verified facts.** It never gets a ledger row, a customer name or a narration — only the checked facts the detectors already produced. So anything it says beyond those facts is, by construction, made up. And then it gets checked anyway.
+
+**The guard is the reason a model is allowed near this at all.** Every generated sentence is examined before a reviewer sees it. Every number must trace back to the finding. Words like "fraudulent", "proves" or "must be" are rejected outright — CA-Guard raises observations, and claiming more than that is not ours to do. **A failure means the text is thrown away and our own wording is shown. There is no second attempt.**
+
+I tested this by writing a deliberately dishonest model — one that invents amounts and declares things fraudulent. **Not one word of its output reached a reviewer.** Rejected every time, on every finding.
+
+**Something the tests caught that I would have missed.** The guard initially rejected *our own* explanation, because it displayed a priority of 0.986722 as "0.99". Rounding a number so a person can read it is faithful, not invented — the guard was wrong, not the text. I only found it because I wrote a test insisting that the always-on path must satisfy its own guard. If our own writing can't pass, the guard is broken.
+
+**An honest finding about AI prose.** I also tested a *well-behaved* model — one that stays truthful. It writes shorter, more fluent text (56 words against our 101). But it only mentioned **62% of the concerns**, against our 100%. Fluent prose summarises, and summarising means quietly dropping things a reviewer needed to see. That is a genuine trade-off, and it is the thing to watch when a real model is measured — not whether it sounds good.
+
+**Privacy is enforced, not promised.** The adapter refuses any address that isn't this machine — and refuses it at setup, not at use, so a mistyped host stops the run rather than quietly posting a client's ledger somewhere. Our strongest claim is that data never leaves the office; it should fail loudly rather than silently.
+
+**Tests/checks:** ruff clean, pyright 0 errors, **388 tests passing**. The whole path — prompt, generation, checking, fallback — is exercised against a scripted stub, so none of this needed a download.
+
+---
+
+### 🔴 [FOUNDER ACTION NEEDED] I did not install the model, and I don't think we should yet
+
+I checked the machine the moment the tests went green, as you instructed:
+
+| | |
+|---|---|
+| Total memory | 8.0 GB |
+| Actually available | **~1.4 to 2.0 GB** |
+| **Swap in use** | **6.9 to 7.8 GB out of 8.0 GB** |
+| Qwen3 1.7B needs | about 2.0 to 2.5 GB |
+
+**The machine is already swapping heavily** — it is borrowing from disk to pretend it has memory it doesn't. Installing now wouldn't just be slow. It would make the timing measurement **meaningless**, because I would be measuring disk paging rather than the model thinking, and it would likely make the laptop unpleasant to use while it ran.
+
+Your instruction 12 said not to download until there is sufficient free RAM. There isn't. **So nothing was downloaded, and nothing was spent.**
+
+**What you can do, whenever convenient:**
+1. Close what you can spare — the biggest holders right now are VS Code, Chrome and a virtual machine running in the background.
+2. Run `make model-check`. It will tell you in one line whether the machine can take it.
+3. When it says sufficient, run `make model-install`. That checks memory again itself and refuses if things have changed. It installs Ollama and Qwen3 1.7B — free, no account, no key, about 1.4 GB.
+
+None of this is urgent. **CA-Guard is complete and usable right now without it.** The model only makes the wording nicer.
+
+**If Qwen3 1.7B reads badly when we do get to it,** your instruction 9 applies and I agree with it: fix the prompt first, don't reach for a bigger model. The 62% coverage figure above already points at where the trouble will be, and that is a prompt problem, not a size problem. A bigger model would come to you as a decision, not a quiet upgrade.
+
+**Credentials needed:** none. **Cost:** ₹0. Nothing downloaded, nothing purchased.
+
+**Next step:** Phase 6 — the interface. The ranked queue, the evidence drawer, and the reviewer's accept/reject/investigate decisions.

@@ -281,5 +281,51 @@ def review(
         typer.echo("")
 
 
+@app.command()
+def explain(
+    path: Annotated[Path, typer.Argument(help="Ledger file (.csv/.xlsx/.parquet)")],
+    top: Annotated[int, typer.Option(help="How many findings to explain")] = 3,
+    model: Annotated[
+        str, typer.Option(help="Local Ollama model tag, or 'none' for no model")
+    ] = "none",
+) -> None:
+    """Explain the top findings in plain language.
+
+    Works with no model installed — that is the normal configuration, not a
+    degraded one. When a local model is used, its output is checked against the
+    finding's own facts before it is shown, and rejected text is replaced by
+    CA-Guard's own wording.
+    """
+    from caguard.explain.ollama import OllamaProvider
+    from caguard.explain.service import ExplanationService
+    from caguard.intake.readers import IntakeError, read_table
+    from caguard.review.fusion import build_findings
+
+    try:
+        frame = read_table(path)
+    except IntakeError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise typer.Exit(1) from exc
+
+    provider = None if model == "none" else OllamaProvider(model=model)
+    service = ExplanationService(provider)
+    findings = build_findings(frame)
+
+    if provider is not None and not provider.available():
+        typer.secho(
+            f"  {provider.name} is not available; using CA-Guard's own wording.",
+            fg=typer.colors.YELLOW,
+        )
+
+    for finding in findings[:top]:
+        result = service.explain(finding)
+        typer.secho(f"\n{'─' * 72}", fg=typer.colors.BRIGHT_BLACK)
+        typer.echo(result.text)
+        typer.secho(
+            f"\n  {result.provenance()}  [{result.latency_seconds:.2f}s]",
+            fg=typer.colors.BRIGHT_BLACK,
+        )
+
+
 if __name__ == "__main__":
     app()

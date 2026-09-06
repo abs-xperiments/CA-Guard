@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import Any
 
 from caguard.detect.types import SignalHit, SignalKind
 from caguard.review.evidence import EvidenceScore
@@ -80,7 +81,7 @@ class Finding:
         """The signal that contributed most — what to lead with."""
         return max(self.contributions.items(), key=lambda item: item[1])[0]
 
-    def structured_facts(self) -> dict[str, object]:
+    def structured_facts(self) -> dict[str, Any]:
         """Everything a grounded explanation may draw on, and nothing else.
 
         Phase 5's prompt is built from exactly this. Anything absent here is
