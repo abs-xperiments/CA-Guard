@@ -113,11 +113,13 @@ class OllamaProvider:
             raise ProviderError(f"Ollama returned malformed JSON: {exc}") from exc
 
 
-def require_loopback(url: str) -> None:
+def require_loopback(url: str, purpose: str = "talk to a model") -> None:
     """Reject any address that is not on this machine.
 
     Fails closed. A configuration mistake must stop the run, not quietly send a
-    client's ledger somewhere else.
+    client's ledger somewhere else. ``purpose`` tailors the message, because the
+    same rule guards the model adapter and the workspace server and a reviewer
+    should be told which one they got wrong.
     """
     host = urlparse(url).hostname
     if host is None:
@@ -127,14 +129,11 @@ def require_loopback(url: str) -> None:
     try:
         if ip_address(host).is_loopback:
             return
-    except ValueError as exc:
-        raise NotLocalError(
-            f"{host!r} is not a loopback address. CA-Guard only talks to a model "
-            "running on this machine; client data must not leave it."
-        ) from exc
+    except ValueError:
+        pass
     raise NotLocalError(
-        f"{host!r} is not a loopback address. CA-Guard only talks to a model "
-        "running on this machine; client data must not leave it."
+        f"{host!r} is not a loopback address. CA-Guard will only {purpose} on this "
+        "machine; a client's ledger must not leave it."
     )
 
 

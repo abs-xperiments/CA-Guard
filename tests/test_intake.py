@@ -129,3 +129,53 @@ def test_build_vouchers_skips_unbalanced_rather_than_raising(ledger) -> None:
     vouchers, rejected = build_vouchers(broken)
     assert "V000002" in rejected
     assert vouchers
+
+
+# --- restoring types to a ledger that arrived as text ------------------------
+
+
+def test_csv_round_trip_restores_working_types(tmp_path: Path, ledger) -> None:
+    """CSV has no types, and the detectors need numbers to be numbers.
+
+    Without this an uploaded file failed deep inside the detectors with a
+    comparison error that told a reviewer nothing.
+    """
+    import pandas as pd
+
+    from caguard.intake.coerce import to_canonical_types
+
+    path = tmp_path / "ledger.csv"
+    ledger.lines.head(200).to_csv(path, index=False)
+    typed = to_canonical_types(read_table(path))
+
+    assert typed.debit_paise.dtype == "int64"
+    assert typed.credit_paise.dtype == "int64"
+    assert typed.is_manual.dtype == bool
+    assert pd.api.types.is_datetime64_any_dtype(typed.voucher_date)
+    assert pd.api.types.is_datetime64_any_dtype(typed.posted_at)
+
+
+def test_blank_means_absent_not_empty(tmp_path: Path, ledger) -> None:
+    """An empty string is not a document reference.
+
+    Treating it as one would quietly erase the evidence gap the whole product
+    is built around.
+    """
+    from caguard.intake.coerce import to_canonical_types
+
+    path = tmp_path / "ledger.csv"
+    ledger.lines.head(200).to_csv(path, index=False)
+    typed = to_canonical_types(read_table(path))
+
+    assert typed.document_ref.isna().any(), "no absent references survived the round trip"
+    assert not (typed.document_ref.dropna() == "").any()
+
+
+def test_coercion_is_safe_on_already_typed_data(ledger) -> None:
+    """Callers should not need to know where their data came from."""
+    from caguard.intake.coerce import to_canonical_types
+
+    once = to_canonical_types(ledger.lines)
+    twice = to_canonical_types(once)
+    assert once.debit_paise.equals(twice.debit_paise)
+    assert once.is_manual.equals(twice.is_manual)

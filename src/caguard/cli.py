@@ -65,6 +65,7 @@ def ingest(
 ) -> None:
     """Read a ledger, convert it to the canonical schema, and report data quality."""
     from caguard.adapters.vynfi import adapt
+    from caguard.intake.coerce import to_canonical_types
     from caguard.intake.readers import IntakeError, read_table
     from caguard.intake.validation import build_vouchers, frame_to_records, validate_lines
 
@@ -75,7 +76,7 @@ def ingest(
         raise typer.Exit(1) from exc
 
     typer.echo(f"Read {len(frame):,} rows from {path.name}")
-    canonical = adapt(frame) if vynfi else frame
+    canonical = adapt(frame) if vynfi else to_canonical_types(frame)
 
     report = validate_lines(frame_to_records(canonical))
     typer.echo(report.summary())
@@ -134,6 +135,7 @@ def detect(
     from caguard.adapters.vynfi import adapt
     from caguard.detect import DetectorConfig, run_signals
     from caguard.detect.runner import count_by_kind, group_by_voucher
+    from caguard.intake.coerce import to_canonical_types
     from caguard.intake.readers import IntakeError, read_table
     from caguard.money import format_inr
 
@@ -143,7 +145,7 @@ def detect(
         typer.secho(str(exc), fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from exc
 
-    canonical = adapt(frame) if vynfi else frame
+    canonical = adapt(frame) if vynfi else to_canonical_types(frame)
     config = DetectorConfig(approval_limit_paise=approval_limit * 100)
     hits = run_signals(canonical, config)
     grouped = group_by_voucher(hits)
@@ -180,6 +182,7 @@ def analyse(
     from caguard.adapters.vynfi import adapt
     from caguard.detect.statistics import benford_by_account
     from caguard.evaluation.baselines import build_approaches
+    from caguard.intake.coerce import to_canonical_types
     from caguard.intake.readers import IntakeError, read_table
 
     try:
@@ -188,7 +191,7 @@ def analyse(
         typer.secho(str(exc), fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from exc
 
-    canonical = adapt(frame) if vynfi else frame
+    canonical = adapt(frame) if vynfi else to_canonical_types(frame)
     context, approaches = build_approaches(canonical)
     total = len(context)
 
@@ -230,6 +233,7 @@ def review(
     """
     from caguard.adapters.vynfi import adapt
     from caguard.detect.types import DetectorConfig
+    from caguard.intake.coerce import to_canonical_types
     from caguard.intake.readers import IntakeError, read_table
     from caguard.money import format_inr
     from caguard.review.finding import RiskBand
@@ -246,7 +250,7 @@ def review(
         typer.secho(str(exc), fg=typer.colors.RED, err=True)
         raise typer.Exit(1) from exc
 
-    canonical = adapt(frame) if vynfi else frame
+    canonical = adapt(frame) if vynfi else to_canonical_types(frame)
     config = DetectorConfig(approval_limit_paise=approval_limit * 100)
     findings = build_findings(canonical, config)
 
@@ -298,6 +302,7 @@ def explain(
     """
     from caguard.explain.ollama import OllamaProvider
     from caguard.explain.service import ExplanationService
+    from caguard.intake.coerce import to_canonical_types
     from caguard.intake.readers import IntakeError, read_table
     from caguard.review.fusion import build_findings
 
@@ -309,7 +314,7 @@ def explain(
 
     provider = None if model == "none" else OllamaProvider(model=model)
     service = ExplanationService(provider)
-    findings = build_findings(frame)
+    findings = build_findings(to_canonical_types(frame))
 
     if provider is not None and not provider.available():
         typer.secho(
@@ -325,6 +330,77 @@ def explain(
             f"\n  {result.provenance()}  [{result.latency_seconds:.2f}s]",
             fg=typer.colors.BRIGHT_BLACK,
         )
+
+
+@app.command()
+def serve(
+    host: Annotated[str, typer.Option(help="Bind address. Loopback only.")] = "127.0.0.1",
+    port: Annotated[int, typer.Option(help="Port to listen on")] = 8000,
+    store: Annotated[Path, typer.Option(help="Where review decisions are kept")] = Path(
+        "data/review.db"
+    ),
+    model: Annotated[
+        str, typer.Option(help="Local model tag, or 'none' for CA-Guard's own wording")
+    ] = "none",
+) -> None:
+    """Run the review workspace API on this machine.
+
+    Loopback only. A client's ledger must not appear on the office network
+    because a bind address was mistyped, so a non-local host is refused rather
+    than warned about.
+    """
+    import uvicorn
+
+    from caguard.api.app import create_app
+    from caguard.explain.ollama import NotLocalError, require_loopback
+
+    try:
+        require_loopback(f"http://{host}:{port}", purpose="serve the workspace")
+    except NotLocalError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise typer.Exit(1) from exc
+
+    typer.secho(f"\n  CA-Guard workspace  →  http://{host}:{port}", fg=typer.colors.GREEN)
+    typer.echo(f"  API docs            →  http://{host}:{port}/docs")
+    typer.echo(f"  decisions stored in →  {store}")
+    typer.echo(f"  explanation model   →  {model}\n")
+    uvicorn.run(create_app(store, model=model), host=host, port=port, log_level="warning")
+
+
+@app.command()
+def export(
+    path: Annotated[Path, typer.Argument(help="Ledger file to analyse")],
+    out: Annotated[Path, typer.Option(help="Where to write the report")] = Path(
+        "review-report.html"
+    ),
+    store: Annotated[Path, typer.Option(help="Review decisions database")] = Path("data/review.db"),
+) -> None:
+    """Write a review report, including any decisions already recorded."""
+    from caguard.api.app import load_ledger
+    from caguard.intake.readers import IntakeError
+    from caguard.review.engagement import open_engagement
+    from caguard.review.fusion import build_findings
+    from caguard.review.report import build_rows, to_csv, to_html
+    from caguard.review.store import ReviewStore
+
+    try:
+        lines = load_ledger(path)
+    except IntakeError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise typer.Exit(1) from exc
+
+    reviews = ReviewStore(store)
+    engagement = reviews.open_engagement(open_engagement(lines, source=path))
+    rows = build_rows(build_findings(lines), reviews.current(engagement.id))
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if out.suffix.lower() == ".csv":
+        out.write_text(to_csv(rows))
+    else:
+        out.write_text(to_html(engagement, rows))
+
+    reviewed = sum(1 for row in rows if row.decision is not None)
+    typer.echo(f"Wrote {len(rows):,} findings ({reviewed:,} reviewed) to {out}")
 
 
 if __name__ == "__main__":

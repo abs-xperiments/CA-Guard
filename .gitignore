@@ -30,3 +30,7 @@ out/
 .DS_Store
 .idea/
 .vscode/
+
+# Local review database — a firm's decisions, never committed
+data/review.db
+data/*.db

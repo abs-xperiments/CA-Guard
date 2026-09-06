@@ -11,7 +11,11 @@ dependencies = [
     "pyarrow>=25,<26",
     "openpyxl>=3.1,<4",
     "scikit-learn>=1.9,<2",
+    "fastapi>=0.136,<1",
+    "uvicorn>=0.34",
+    "python-multipart>=0.0.20",
     "typer>=0.15",
+    "python-multipart>=0.0.32",
 ]
 
 [project.optional-dependencies]
@@ -20,6 +24,7 @@ dev = [
     "pytest-cov>=6",
     "ruff>=0.15",
     "pyright>=1.1.400",
+    "httpx>=0.28",
 ]
 
 [project.scripts]
