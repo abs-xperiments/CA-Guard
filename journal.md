@@ -260,3 +260,47 @@ I also left a **tripwire**: a test that fails the moment the model finds somethi
 **Credentials needed:** none. Still ₹0.
 
 **Next step:** Phase 4 — combining the signals into a single review priority, with the evidence gap as a first-class input. The bar is set by this phase: rules alone give 100% recall with zero false alarms on legitimate entries. **Fusion has to beat that, not just match it.** If it cannot, I will say so.
+
+---
+
+## 2026-09-06 07:25 IST — [PHASE 4] Ranking is the product. And the evidence idea works — but not the way I built it.
+
+**What happened:**
+Phase 4 turns the ten independent signals into one ordered review queue, and adds the thing this project has been arguing for since the beginning: **whether a transaction can actually be supported** feeds into how urgently it needs looking at.
+
+**The bar was set by Phase 3 and it was awkward.** The rules already find *everything* — 100% of the planted irregularities, with no false alarms on legitimate entries. There is no recall left to win. So combining signals could not be justified by "we find more". It had to be justified by something else, and the only honest candidate was: **does the reviewer see the right things first?**
+
+That turned out to be where the whole value is.
+
+| | First 25 items a reviewer opens | Work to find 95% of the problems |
+|---|---|---|
+| Same queue, in ledger order | **34% real** | 229 vouchers |
+| **Ranked by priority** | **100% real** | **157 vouchers** |
+
+In plain terms: without ranking, a CA working down the list is wrong two times out of three and slowly loses faith in the tool. With ranking, the first twenty-five items are *all* real, and finding almost everything takes about a third less work. That is the product.
+
+**The experiment I actually cared about.** `docs/03_PATENT_AND_IP.md` singles out "evidence availability drives review priority" as the one idea our prior-art search did not find already taken. Until today that was an assertion. So I ran it as a proper experiment: build the queue with evidence information, build it without, change nothing else, measure.
+
+**Removing evidence entirely costs 30 points of precision in the first ten items** (100% → 70%), 18 points at twenty-five, pushes the work to find 95% from 157 vouchers up to 215, and drops overall recall from 99.8% to 96%.
+
+So the mechanism is real and load-bearing. It stays a **candidate**, not a claim — nothing about the prior-art position has changed.
+
+**But here is the part I did not expect, and would rather report than hide.** I built the evidence idea two ways: as a rule that flags entries with nothing behind them, and as a separate adjustment that nudges every voucher's score by how complete its paperwork is. The rule does essentially all the work. **The separate adjustment adds 1.6 points at fifty items and nothing anywhere else.**
+
+That is worth saying plainly because it sharpens what the mechanism actually is. Evidence availability matters to prioritisation — strongly. But the effective way to use it is to let a missing document *raise* a finding, not to fine-tune a score afterwards. I kept the adjustment because it costs nothing and covers partial gaps the rule cannot reach, but I am not going to pretend it is what makes the difference.
+
+**The machine-learning layer contributed nothing. Again.** Running the queue with the model and without it produces *identical* results on every measure. The low weight and the rule that stops it raising anything on its own are doing exactly what Phase 3 concluded they should.
+
+**How the scores combine.** Not by adding weights together — that lets three minor concerns outvote one serious one, and produces numbers above 1 that mean nothing. Instead each signal is treated as independent evidence, which keeps the score between 0 and 1 and reads sensibly as "the chance at least one of these concerns is real". Every finding carries its own arithmetic: which signals fired, how much each contributed, how complete the evidence is, and the exact ledger lines behind it. A CA who disagrees can see the working.
+
+That completeness is also deliberate groundwork. In Phase 5 the local AI model will be allowed to explain a finding using **only** what is recorded on it. Building that record now is what turns "the AI must not make things up" into a property of the data rather than a hopeful instruction in a prompt.
+
+**Tests/checks:** ruff clean, pyright 0 errors, **326 tests passing** plus the two full-corpus tests.
+
+**Git commit:** see below.
+
+**Founder decision needed:** none.
+
+**Credentials needed:** none. Still ₹0.
+
+**Next step:** Phase 5 — the local, private AI explanation. This is the first phase that needs a model on this machine, which means installing Ollama (free, no account, no key) and a small model that fits in 8 GB. The rule is absolute: it explains the structured finding and nothing else, and detection keeps working with the model switched off entirely.

@@ -24,3 +24,6 @@
 | D-020 | Rules remain the primary detector. The model is retained but weighted low and must corroborate; it may not raise a voucher alone. | Decided | On held-out seeds it found 0 anomalies the rules missed and queued 30 legitimate vouchers. ADR-0005. |
 | D-021 | Benford's law is reported per account as a diagnostic, never as a per-voucher flag. | Decided | A single number has no distribution. |
 | D-022 | Phase 4 fusion is measured against rules-alone as the baseline to beat. | Decided | Adding signals that lower precision is not progress. |
+| D-023 | Priority is fused with noisy-OR, not a weighted sum, and every finding carries its per-signal contributions. | Decided | A sum lets weak concerns outvote a decisive one and exceeds 1 meaninglessly. ADR-0006. |
+| D-024 | Evidence availability is used as a detection signal, with the score uplift retained but recognised as near-redundant. | Decided | Removing evidence entirely costs 30pp at p@10; the uplift alone adds 1.6pp at p@50. ADR-0006. |
+| D-025 | Phase 4 is judged on ordering, not recall. | Decided | Rules already reached 100% recall in Phase 2. Ranking took p@25 from 34% to 100%. |

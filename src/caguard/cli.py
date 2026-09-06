@@ -212,5 +212,74 @@ def analyse(
             typer.echo(f"    {result.summary()}")
 
 
+@app.command()
+def review(
+    path: Annotated[Path, typer.Argument(help="Ledger file (.csv/.xlsx/.parquet)")],
+    vynfi: Annotated[bool, typer.Option("--vynfi", help="Treat input as the VynFi corpus")] = False,
+    approval_limit: Annotated[
+        int, typer.Option(help="Delegation-of-authority limit in rupees (firm-specific)")
+    ] = 50_000,
+    top: Annotated[int, typer.Option(help="How many findings to show")] = 10,
+    weights: Annotated[bool, typer.Option("--weights", help="Print the weight table")] = False,
+) -> None:
+    """Build the prioritised review queue, highest priority first.
+
+    Every finding shows its priority, the concerns behind it, how complete its
+    evidence trail is, and the ledger lines it came from — so the ranking can be
+    argued with rather than taken on trust.
+    """
+    from caguard.adapters.vynfi import adapt
+    from caguard.detect.types import DetectorConfig
+    from caguard.intake.readers import IntakeError, read_table
+    from caguard.money import format_inr
+    from caguard.review.finding import RiskBand
+    from caguard.review.fusion import build_findings, explain_weights
+
+    if weights:
+        typer.echo("\nSignal weights (frozen in ADR-0006):\n")
+        typer.echo(explain_weights())
+        typer.echo("")
+
+    try:
+        frame = read_table(path)
+    except IntakeError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise typer.Exit(1) from exc
+
+    canonical = adapt(frame) if vynfi else frame
+    config = DetectorConfig(approval_limit_paise=approval_limit * 100)
+    findings = build_findings(canonical, config)
+
+    total = canonical["voucher_id"].nunique()
+    bands = {band: sum(f.band is band for f in findings) for band in RiskBand}
+    typer.echo(
+        f"\n{len(findings):,} of {total:,} vouchers need review "
+        f"({len(findings) / total:.1%})   "
+        f"high {bands[RiskBand.HIGH]} · medium {bands[RiskBand.MEDIUM]} · "
+        f"low {bands[RiskBand.LOW]}\n"
+    )
+
+    colours = {
+        RiskBand.HIGH: typer.colors.RED,
+        RiskBand.MEDIUM: typer.colors.YELLOW,
+        RiskBand.LOW: typer.colors.WHITE,
+    }
+    for finding in findings[:top]:
+        typer.secho(
+            f"  [{finding.band.value.upper():6s}] {finding.voucher_id}  "
+            f"{format_inr(finding.amount_paise):>18s}  {finding.voucher_date}  "
+            f"priority {finding.priority:.2f}",
+            fg=colours[finding.band],
+            bold=finding.band is RiskBand.HIGH,
+        )
+        for reason in finding.reasons:
+            typer.echo(f"        · {reason}")
+        typer.echo(
+            f"        evidence {finding.evidence.completeness:.0%} — {finding.evidence.summary()}"
+        )
+        typer.echo(f"        lines: {', '.join(finding.line_ids)}")
+        typer.echo("")
+
+
 if __name__ == "__main__":
     app()

@@ -23,8 +23,9 @@ Signal fusion itself is an engineering technique, not our novelty — commercial
 | 1 — Foundation: schema, intake, benchmark generator | ✅ Complete |
 | 2 — Deterministic audit-review signals | ✅ Complete |
 | 3 — Statistical + ML anomaly engine | ✅ Complete |
-| 4 — Risk fusion + evidence | Next |
-| 5–7 | Planned (`docs/11_IMPLEMENTATION_ROADMAP.md`) |
+| 4 — Risk fusion + evidence | ✅ Complete |
+| 5 — Local/private AI explanation | Next |
+| 6–7 | Planned (`docs/11_IMPLEMENTATION_ROADMAP.md`) |
 
 Ten deterministic signals now produce a review queue with structured evidence behind every finding. No scoring or fusion yet — signals stay independent so a reviewer sees *which* concern fired.
 
@@ -50,6 +51,17 @@ The model surfaced **zero** anomalies the rules missed, on every held-out seed, 
 
 **Statistical unusualness is not audit relevance.** That is the project's thesis and this is the first direct evidence for it. It is *not* a claim that ML is useless on real books — see `docs/adr/0005-ml-adds-nothing-on-this-benchmark.md` for the honest limits.
 
+### Phase 4 result — ranking is the product
+
+Recall was already 100% after Phase 2, so fusion had to earn its place on what a reviewer sees *first*.
+
+| | First 25 items | Work to find 95% |
+|---|---|---|
+| Same queue, ledger order | 34% real | 229 vouchers |
+| **Ranked by fused priority** | **100% real** | **157 vouchers** |
+
+Removing evidence information entirely costs 30 points of precision in the first 10 items and drops recall to 96% — the first real support for evidence-gap-driven prioritisation. Details and the honest limits in `docs/adr/0006-fusion-weights-and-the-evidence-mechanism.md`.
+
 ## Quickstart
 
 Requires [uv](https://docs.astral.sh/uv/) and Python 3.13. Everything below runs locally and costs nothing.
@@ -68,6 +80,7 @@ uv run caguard columns  ledger.csv             # how do these headers map?
 uv run caguard ingest   ledger.csv             # convert and report data quality
 uv run caguard detect   ledger.csv             # run the signals, print the review queue
 uv run caguard analyse  ledger.csv             # rules vs statistics vs model, side by side
+uv run caguard review   ledger.csv             # the prioritised review queue
 
 make data                                       # fetch the VynFi corpus (~34 MB)
 uv run caguard ingest data/external/shard0.parquet --vynfi
@@ -95,10 +108,11 @@ src/caguard/
   intake/             readers, column mapping, validation
   adapters/vynfi.py   the SAP-shaped external corpus
   detect/             signals, statistics and the model — cannot import benchmark/
-  evaluation/         set metrics and the baseline comparison
+  review/             evidence scoring, findings, transparent fusion
+  evaluation/         set metrics, baseline comparison, ablation
   benchmark/          the generator — importable by nothing else (ADR-0003)
   cli.py
-tests/                298 tests: integrity guards, ledger coherence, signal quality
+tests/                328 tests: integrity guards, ledger coherence, signal quality, ranking
 docs/                 the method: charter, research, ADRs, phase plans
 journal.md            the running record, in plain language
 ```
