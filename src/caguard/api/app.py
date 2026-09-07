@@ -35,7 +35,7 @@ from caguard.detect.types import DetectorConfig
 from caguard.explain.ollama import OllamaProvider
 from caguard.explain.service import ExplanationService
 from caguard.intake.normalise import NormalisationError, NormalisationReport, normalise
-from caguard.intake.readers import IntakeError, read_table
+from caguard.intake.readers import SUPPORTED_SUFFIXES, IntakeError, read_table, safe_suffix
 from caguard.review.decisions import Decision, ReviewAction
 from caguard.review.engagement import Engagement, open_engagement
 from caguard.review.finding import Finding, RiskBand
@@ -147,7 +147,14 @@ def create_app(
         if len(payload) > MAX_UPLOAD_BYTES:
             raise HTTPException(413, f"File is larger than {MAX_UPLOAD_BYTES // 1024 // 1024} MB")
 
-        suffix = Path(file.filename or "ledger.csv").suffix.lower()
+        # Never build a path from an uploaded filename: only a suffix we
+        # recognise is carried across.
+        suffix = safe_suffix(file.filename)
+        if not suffix:
+            raise HTTPException(
+                400,
+                f"Unsupported file type. CA-Guard reads {', '.join(sorted(SUPPORTED_SUFFIXES))}.",
+            )
         temp = Path(workspace.store.path).parent / f"_upload{suffix}"
         temp.write_bytes(payload)
         try:

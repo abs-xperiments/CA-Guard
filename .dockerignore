@@ -1,0 +1,13 @@
+.git
+.venv
+node_modules
+web/node_modules
+web/.next
+__pycache__
+.pytest_cache
+.ruff_cache
+data
+*.parquet
+*.db
+docs
+tests

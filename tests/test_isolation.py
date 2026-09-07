@@ -30,8 +30,13 @@ DETECT_PACKAGE = SRC / "detect"
 #: legitimately need to invoke the generator; detectors never do.
 ALLOWED_IMPORTERS: dict[str, str] = {
     "cli.py": "the `caguard generate` command must be able to invoke the generator",
+    "benchmark.py": (
+        "the evaluation runner exists to compare predictions against planted "
+        "truth; that comparison is its entire job. It reads the ground truth and "
+        "never influences a detector, which is the distinction rule 1 protects."
+    ),
 }
-MAX_ALLOWED = 2
+MAX_ALLOWED = 3
 
 
 def _modules_outside_benchmark() -> list[Path]:
@@ -95,7 +100,14 @@ def test_the_exception_list_stays_small() -> None:
 def test_allowed_importers_still_exist() -> None:
     """A stale exemption would silently widen the rule."""
     for name in ALLOWED_IMPORTERS:
-        assert (SRC / name).is_file(), f"{name} is exempted but no longer exists"
+        matches = [
+            path for path in SRC.rglob(name) if "benchmark" not in path.relative_to(SRC).parts
+        ]
+        assert matches, f"{name} is exempted but no longer exists"
+        assert len(matches) == 1, (
+            f"{name} exists in more than one place, so the exemption is ambiguous: "
+            f"{[str(m.relative_to(SRC)) for m in matches]}"
+        )
 
 
 @pytest.mark.parametrize("module", _modules_outside_benchmark(), ids=lambda p: p.stem)

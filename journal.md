@@ -500,3 +500,57 @@ That last one matters most. If your file has no column for supporting-document r
 **Founder decision needed:** none. **Cost:** ₹0.
 
 **Worth saying:** this is the second time a bug has come from testing only against data CA-Guard generated itself. The first was the ledger that did not balance. Both were found by looking at the thing the way a real user would. The outstanding CA review in `docs/ca_validation/` is the same kind of check, and still worth getting.
+
+---
+
+## 2026-09-07 — [PHASE 7] The last one. Every claim is now a command, and the whole thing runs in a container.
+
+**What happened:**
+Phase 7 was about making the work checkable by someone else, safe to run on a firm's machine, and installable without spending anything.
+
+**Every number is now reproducible.** Six phases produced measurements scattered across design records and journal entries, and anyone wanting to verify them had to take my word for it. That is not good enough for something being written up. So there is now a single command:
+
+```
+uv run caguard benchmark
+```
+
+It runs the held-out test ledgers against frozen settings and prints everything: how each of the ten checks performs, whether the machine-learning layer adds anything, what ranking does to a reviewer's queue, and whether the evidence idea is actually doing work. It writes `docs/RESULTS.md` directly. **If a number in the write-up disagrees with the runner, the write-up is wrong.**
+
+It also *refuses* to run on the ledgers I used while building. Reporting on those would be reporting on the answer sheet.
+
+All the earlier claims held when regenerated: no check falls for its decoy, the machine-learning layer finds nothing the rules missed on any seed, ranking takes the first 25 items from 34% useful to 100% useful, and removing the evidence information costs 30 points of precision.
+
+**Security is now part of every run, not a one-off review.** Dependency checks run alongside the tests, locally and in CI — both clean, no known vulnerabilities in anything we depend on. There are 17 security tests, including the one that matters most: **the entire analysis runs with every network call made to fail.** That is the privacy promise proven rather than asserted.
+
+**One genuine weakness found.** Uploaded filenames were being trusted to produce a temporary filename. A Windows-style path like `..\..\windows\system32` doesn't get cleaned up the way you'd expect on a Mac — the whole thing after the first dot is treated as a file extension. Harmless here, a directory escape on Windows. File extensions are now checked against a list of what we accept rather than trusted.
+
+**The self-hosted version works.** One command:
+
+```
+docker compose up --build
+```
+
+I built the image and tested it properly rather than just writing the file. It runs as an unprivileged user, never as root. It reaches nothing on the internet. And **the analysis engine is deliberately not exposed at all** — it only listens inside the container, so even a mistyped setting can't put a client's ledger endpoints on the office network. I uploaded a Tally file through it (24 findings from 431 vouchers), recorded a decision, restarted the container, and confirmed the decision and its note were still there.
+
+**Tests/checks:** ruff clean, pyright 0 errors, **483 tests passing**, both dependency audits clean, container verified end to end.
+
+---
+
+### 🔵 [FOUNDER DECISION] The Railway question is now live
+
+You said at C-1: keep everything at ₹0, and revisit hosting once the product actually works. **It works.** So this is now a real decision rather than a deferred one, and I have not spent anything or deployed anything.
+
+**Option A — a local demonstration, ₹0.** Run the container, record the screen. For a faculty review, a conference or a portfolio this shows exactly the same product. It is also the more honest option, because a local install *is* what CA-Guard is designed to be.
+
+**Option B — Railway, $5/month.** A public URL anyone can open. Three conditions I would insist on:
+1. **Synthetic data only, permanently.** No client ledger ever goes near it.
+2. **A password gate.** A public URL is public — without one, strangers upload files and run up the bill.
+3. **Honest wording on the page.** It must say it is a demonstration on synthetic data, and that the privacy claim applies to the self-hosted version. Anything else would mislead a CA about where their data sits.
+
+**My recommendation: Option A for now.** The product's whole argument is that it runs on your own machine — a cloud demo slightly undercuts the pitch, and a screen recording carries the same weight for an academic reviewer at no cost and no risk. Railway makes sense later if you want people trying it themselves without installing anything.
+
+Nothing in the code needs to change for either. `docs/deploy.md` has the detail.
+
+**Credentials needed:** none, unless you choose Option B, in which case a Railway account.
+
+**Still outstanding:** the CA validation pack from Phase 1. It remains the only outside check on whether the synthetic ledger looks like a real book, and two of the more embarrassing bugs this project has had were realism faults a practitioner would have spotted immediately.

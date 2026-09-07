@@ -403,5 +403,53 @@ def export(
     typer.echo(f"Wrote {len(rows):,} findings ({reviewed:,} reviewed) to {out}")
 
 
+@app.command()
+def benchmark(
+    out: Annotated[Path | None, typer.Option(help="Write the results markdown here")] = None,
+    vouchers: Annotated[int, typer.Option(help="Ledger size per seed")] = 4000,
+    seeds: Annotated[
+        str, typer.Option(help="Comma-separated held-out seeds")
+    ] = "101,102,103,104,105",
+) -> None:
+    """Regenerate every number this project claims.
+
+    Runs held-out seeds against frozen thresholds and prints what it finds.
+    There is deliberately no option that improves the result: a benchmark you
+    can adjust is one that will be adjusted.
+    """
+    from caguard.evaluation.benchmark import TuningSeedError, as_markdown
+    from caguard.evaluation.benchmark import run as run_benchmark
+
+    chosen = tuple(int(value) for value in seeds.split(",") if value.strip())
+    typer.echo(f"\nRunning {len(chosen)} held-out seeds at {vouchers:,} vouchers each…\n")
+
+    try:
+        result = run_benchmark(seeds=chosen, vouchers=vouchers)
+    except TuningSeedError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED, err=True)
+        raise typer.Exit(1) from exc
+
+    typer.echo(result.signals.to_string())
+    typer.echo("")
+    typer.echo(result.approaches.to_string())
+    typer.echo("")
+    typer.echo(result.ranking.to_string())
+    typer.echo("")
+    typer.secho(
+        f"  Trap false positives: {int(result.signals.trap_false_positives.sum())}",
+        fg=typer.colors.GREEN,
+    )
+    typer.secho(
+        f"  Anomalies the model found that the rules missed: {result.model_unique_finds}",
+        fg=typer.colors.GREEN if result.model_adds_nothing else typer.colors.YELLOW,
+    )
+    typer.echo(f"  Fingerprint: {result.fingerprint()}")
+
+    if out is not None:
+        out.parent.mkdir(parents=True, exist_ok=True)
+        out.write_text(as_markdown(result))
+        typer.echo(f"\n  Wrote {out}")
+
+
 if __name__ == "__main__":
     app()

@@ -21,6 +21,18 @@ class IntakeError(ValueError):
     """A file we cannot or should not read. The message is shown to the user."""
 
 
+def safe_suffix(filename: str | None) -> str:
+    """The file's extension, or nothing — never anything that could be a path.
+
+    An uploaded filename is untrusted. ``Path("..\\..\\windows\\x").suffix`` on
+    POSIX returns ``".\\windows\\x"``, because a backslash is not a separator
+    there; putting that into a temporary filename would traverse on Windows. So
+    the suffix is matched against what we support rather than trusted.
+    """
+    candidate = Path(filename or "").suffix.lower()
+    return candidate if candidate in SUPPORTED_SUFFIXES else ""
+
+
 def read_table(path: Path, *, sheet: str | int = 0) -> pd.DataFrame:
     """Read a ledger export into a DataFrame, with everything left as text where possible.
 

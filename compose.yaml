@@ -1,0 +1,41 @@
+# CA-Guard, self-hosted on one machine.
+#
+#   docker compose up --build   →  http://127.0.0.1:3000
+#
+# No account, no key, no cost. A client's ledger is read on this machine and
+# never leaves it.
+
+services:
+  caguard:
+    build: .
+    image: ca-guard:local
+    container_name: ca-guard
+
+    ports:
+      # Bound to loopback deliberately. Publishing on 0.0.0.0 would put a
+      # client's ledger on the office network; change this only if you have
+      # decided to, and put authentication in front of it.
+      - "127.0.0.1:3000:3000"
+
+    volumes:
+      # Review decisions and the audit trail. Back this file up; it is the only
+      # thing in the system that cannot be recomputed.
+      - caguard-data:/data
+
+    environment:
+      CAGUARD_STORE: /data/review.db
+      # "none" uses CA-Guard's own wording and needs nothing installed. Point
+      # this at a local model tag only if you are running one.
+      CAGUARD_MODEL: ${CAGUARD_MODEL:-none}
+
+    restart: unless-stopped
+
+    # Analysis is entirely local. Nothing here should ever need to resolve a
+    # hostname beyond the container itself.
+    dns_search: []
+
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  caguard-data:

@@ -24,7 +24,17 @@ test:  ## Fast offline tests
 test-all:  ## Every test, including the full VynFi corpus (needs `make data`)
 	uv run pytest
 
-check: lint types test  ## The gate every phase must pass
+audit:  ## Check dependencies for known vulnerabilities (free, no account)
+	uv run --with pip-audit pip-audit --skip-editable
+	cd web && npm audit --omit=dev
+
+benchmark:  ## Regenerate every number the project claims
+	uv run caguard benchmark --out docs/RESULTS.md
+
+docker:  ## Build and run the self-hosted image on 127.0.0.1:3000
+	docker compose up --build
+
+check: lint types test audit  ## The gate every phase must pass
 
 data:  ## Download the VynFi corpus (Apache-2.0, ~34 MB, never committed)
 	@mkdir -p data/external
