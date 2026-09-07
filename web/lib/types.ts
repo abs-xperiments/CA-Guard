@@ -49,6 +49,17 @@ export interface Engagement {
   opened_at: string;
 }
 
+export interface IntakeReport {
+  summary: string;
+  mapped: Record<string, string>;
+  derived: string[];
+  not_in_file: string[];
+  ignored: string[];
+  notes: string[];
+  rows_read: number;
+  rows_used: number;
+}
+
 export interface Queue {
   engagement: Engagement;
   findings: Finding[];
@@ -57,6 +68,7 @@ export interface Queue {
   bands: Record<string, number>;
   states: Record<string, number>;
   model_available: boolean;
+  intake: IntakeReport | null;
 }
 
 export interface Decision {

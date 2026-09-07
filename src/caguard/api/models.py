@@ -114,6 +114,24 @@ class EngagementOut(BaseModel):
         )
 
 
+class IntakeReportOut(BaseModel):
+    """What CA-Guard made of the uploaded file's columns.
+
+    Shown to the reviewer because a limitation of the *file* must never be
+    mistaken for a finding about the *client*: "no supporting document" means
+    something very different when the file has no such column.
+    """
+
+    summary: str
+    mapped: dict[str, str]
+    derived: list[str]
+    not_in_file: list[str]
+    ignored: list[str]
+    notes: list[str]
+    rows_read: int
+    rows_used: int
+
+
 class QueueOut(BaseModel):
     """The review queue, with enough summary for the header."""
 
@@ -124,6 +142,7 @@ class QueueOut(BaseModel):
     bands: dict[str, int]
     states: dict[str, int]
     model_available: bool
+    intake: IntakeReportOut | None = None
 
 
 class DecisionIn(BaseModel):

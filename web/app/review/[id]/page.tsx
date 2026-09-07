@@ -17,6 +17,7 @@ import type { Decision, Finding, Queue, RiskBand } from "@/lib/types";
 import { concernLabel } from "@/lib/types";
 import { EvidenceDrawer } from "@/components/EvidenceDrawer";
 import { FindingsTable } from "@/components/FindingsTable";
+import { IntakeNotice } from "@/components/IntakeNotice";
 import { Button, EmptyState, ErrorState, Key, Spinner, Stat, cx } from "@/components/ui";
 
 type BandFilter = RiskBand | "all";
@@ -254,6 +255,7 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
+            {queue.intake ? <IntakeNotice intake={queue.intake} /> : null}
             {visible.length === 0 ? (
               <EmptyState
                 icon={<Inbox size={22} />}

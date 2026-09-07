@@ -20,6 +20,18 @@ ALIASES: dict[str, frozenset[str]] = {
     "voucher_id": frozenset(
         {
             "voucher id",
+            "voucher",
+            "voucher number",
+            "vch",
+            "vchno",
+            "document no",
+            "doc id",
+            "entry id",
+            "je no",
+            "transaction id",
+            "txn id",
+            "ref no",
+            "reference no",
             "voucher no",
             "vch no",
             "vch no.",
@@ -36,6 +48,8 @@ ALIASES: dict[str, frozenset[str]] = {
         {
             "date",
             "voucher date",
+            "txn date",
+            "dated",
             "vch date",
             "document date",
             "document_date",
@@ -74,6 +88,10 @@ ALIASES: dict[str, frozenset[str]] = {
             "account_name",
             "ledger",
             "ledger name",
+            "ledger account",
+            "head",
+            "account head",
+            "gl description",
             "particulars",
             "account description",
             "account_description",
@@ -89,8 +107,12 @@ ALIASES: dict[str, frozenset[str]] = {
             "financial_statement_category",
         }
     ),
-    "debit": frozenset({"debit", "debit amount", "debit_amount", "dr", "dr amount"}),
-    "credit": frozenset({"credit", "credit amount", "credit_amount", "cr", "cr amount"}),
+    "debit": frozenset(
+        {"debit", "debit amount", "debit_amount", "dr", "dr amount", "debit inr", "debit rs"}
+    ),
+    "credit": frozenset(
+        {"credit", "credit amount", "credit_amount", "cr", "cr amount", "credit inr", "credit rs"}
+    ),
     "amount": frozenset({"amount", "transaction amount", "local amount", "local_amount", "value"}),
     "currency": frozenset({"currency", "curr", "currency code"}),
     "created_by": frozenset(

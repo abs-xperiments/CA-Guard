@@ -28,12 +28,13 @@ from caguard.api.models import (
     EngagementOut,
     ExplanationOut,
     FindingOut,
+    IntakeReportOut,
     QueueOut,
 )
 from caguard.detect.types import DetectorConfig
 from caguard.explain.ollama import OllamaProvider
 from caguard.explain.service import ExplanationService
-from caguard.intake.coerce import to_canonical_types
+from caguard.intake.normalise import NormalisationError, NormalisationReport, normalise
 from caguard.intake.readers import IntakeError, read_table
 from caguard.review.decisions import Decision, ReviewAction
 from caguard.review.engagement import Engagement, open_engagement
@@ -52,6 +53,7 @@ class Analysis:
     engagement: Engagement
     lines: pd.DataFrame
     findings: list[Finding]
+    intake: NormalisationReport | None = None
 
     @property
     def by_voucher(self) -> dict[str, Finding]:
@@ -83,12 +85,17 @@ class Workspace:
             return False
         return OllamaProvider(model=self.model).available()
 
-    def analyse(self, lines: pd.DataFrame, source: str) -> Analysis:
+    def analyse(
+        self,
+        lines: pd.DataFrame,
+        source: str,
+        intake: NormalisationReport | None = None,
+    ) -> Analysis:
         engagement = self.store.open_engagement(open_engagement(lines, source=source))
         cached = self.analyses.get(engagement.id)
         if cached is not None:
             return cached
-        analysis = Analysis(engagement, lines, build_findings(lines, self.config))
+        analysis = Analysis(engagement, lines, build_findings(lines, self.config), intake=intake)
         self.analyses[engagement.id] = analysis
         return analysis
 
@@ -144,13 +151,32 @@ def create_app(
         temp = Path(workspace.store.path).parent / f"_upload{suffix}"
         temp.write_bytes(payload)
         try:
-            lines = to_canonical_types(read_table(temp))
+            raw = read_table(temp)
         except IntakeError as exc:
             raise HTTPException(400, str(exc)) from exc
         finally:
             temp.unlink(missing_ok=True)
 
-        analysis = workspace.analyse(lines, source=file.filename or "uploaded ledger")
+        # A real ledger does not arrive in our schema. Map it, derive what can be
+        # derived, and say plainly what the file did not contain.
+        try:
+            normalised = normalise(raw)
+        except NormalisationError as exc:
+            raise HTTPException(400, str(exc)) from exc
+
+        try:
+            analysis = workspace.analyse(
+                normalised.lines,
+                source=file.filename or "uploaded ledger",
+                intake=normalised.report,
+            )
+        except Exception as exc:
+            raise HTTPException(
+                400,
+                "CA-Guard could not analyse this file. It was read and its columns "
+                f"were recognised, but the analysis failed: {exc}",
+            ) from exc
+
         return _queue(workspace, analysis)
 
     @app.get("/api/engagements/{engagement_id}/queue", response_model=QueueOut)
@@ -246,7 +272,22 @@ def _queue(workspace: Workspace, analysis: Analysis) -> QueueOut:
     }
     states["not yet reviewed"] = len(findings) - sum(states.values())
 
+    intake = analysis.intake
     return QueueOut(
+        intake=(
+            IntakeReportOut(
+                summary=intake.summary(),
+                mapped=intake.mapped,
+                derived=intake.derived,
+                not_in_file=intake.defaulted,
+                ignored=intake.ignored,
+                notes=intake.notes,
+                rows_read=intake.rows_in,
+                rows_used=intake.rows_out,
+            )
+            if intake is not None
+            else None
+        ),
         engagement=EngagementOut.build(analysis.engagement),
         findings=findings,
         total_vouchers=analysis.engagement.voucher_count,
@@ -258,8 +299,8 @@ def _queue(workspace: Workspace, analysis: Analysis) -> QueueOut:
 
 
 def load_ledger(path: Path | str) -> pd.DataFrame:
-    """Read a ledger from disk, typed and ready for the pipeline."""
-    return to_canonical_types(read_table(Path(path)))
+    """Read a ledger from disk, normalised and ready for the pipeline."""
+    return normalise(read_table(Path(path))).lines
 
 
 def frame_from_csv(text: str) -> pd.DataFrame:

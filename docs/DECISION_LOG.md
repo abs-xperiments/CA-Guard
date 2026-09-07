@@ -40,3 +40,6 @@
 | D-036 | Findings are recomputed, never stored; the engagement stores the ledger hash instead. | Decided | A stored copy would drift from what the code now says, and nobody would know which was right. |
 | D-037 | The workspace is keyboard-first, and rejection is deliberately not a bare keystroke. | Decided | A CA working a long queue should not need the mouse, but a dismissal needs a typed reason. |
 | D-038 | The UI derives its counters from the findings on screen, not from a server snapshot. | Decided | The snapshot never updated as decisions were recorded, so the progress bar was a lie. |
+| D-039 | Uploaded files are mapped and normalised into the canonical schema; the upload path never assumes canonical column names. | Decided | A Tally export crashed with a bare 500. The mapping existed since Phase 1 but was never wired to the upload. |
+| D-040 | The intake report is shown to the reviewer before any finding. | Decided | A file with no document column makes every entry look undocumented; a limitation of the file must not read as a finding about the client. |
+| D-041 | Rupee and paise amounts are handled by separate code paths that never mix. | Decided | Confusing them is a hundred-fold error and would be invisible. |

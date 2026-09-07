@@ -458,3 +458,45 @@ Then they accept, reject, or mark it for investigation.
 **Credentials needed:** none. **Cost: ₹0.** Next.js, Tailwind and the icons are all free and open source, and the components are written into the repository rather than pulled from a paid library.
 
 **Next step:** Phase 7 — the last one. Benchmark runner, security checks, the Docker self-hosted path, and the deployment story. That is where the Railway question comes back, and where I will need a decision from you about whether to deploy publicly at all.
+
+---
+
+## 2026-09-07 — [BUGFIX] "Internal Server Error" on upload. The cause was a missing feature, not a small fault.
+
+**What you reported:** adding a ledger file failed with "Something went wrong — Internal Server Error".
+
+**What was actually wrong:** CA-Guard was only able to read files that already used *its own* column names. Any real ledger — a Tally export, a spreadsheet from a client, anything with "Vch No." and "Particulars" instead of `voucher_id` and `account_name` — crashed deep inside the analysis, and the browser showed you a blank server error that told you nothing.
+
+I reproduced it in a minute by exporting a Tally-shaped CSV. It failed exactly as you described.
+
+**Why it happened, honestly.** Back in Phase 1 I built the column-matching logic — the part that knows "Vch No." means a voucher number — and wired it to a command-line tool. I then built the upload path in Phase 6 and never connected the two. The product specification lists "map and confirm columns" as step three of the user journey, and I skipped it. My own tests all used files CA-Guard had generated itself, so nothing caught it. That is the kind of gap that only a real user with a real file finds, which is exactly what happened.
+
+**What I built to fix it properly:**
+
+A file now goes through a proper intake stage that does three things and reports on all of them:
+
+- **Recognises** the columns it knows — "Vch No.", "Voucher", "Particulars", "Ledger", "Account Head", "Txn ID", "Dr", "Cr" and many more spellings.
+- **Works out** what it can. The financial year and quarter follow from the date. Line numbers come from position within the voucher. Where a file has no account codes, the ledger name is used instead so account-level checks still work.
+- **Says plainly** what the file did not contain.
+
+That last one matters most. If your file has no column for supporting-document references, then *every* entry looks undocumented — and CA-Guard would otherwise fill your queue with "no supporting document" findings about a client who documented everything properly. So before you see a single finding, the screen now says:
+
+> **Some checks are limited by what this file contains**
+> This file has no supporting-document column, so every entry looks undocumented. Evidence findings will not be meaningful until one is supplied.
+> This file has no approver column, so approval cannot be checked.
+> This file records no posting time, so out-of-hours entries cannot be identified.
+
+**A limitation of the file must never be mistaken for a finding about the client.** That principle is now built into the product.
+
+**Other things fixed along the way:**
+- **Amounts.** A file gives rupees; CA-Guard works in paise. Get that wrong and every figure is out by a hundred. The two are now handled by completely separate code paths so they cannot be confused, and commas, ₹ symbols and bracketed negatives like (1,200) are all read correctly.
+- **Dates.** 03-04-2025 in an Indian ledger is 3 April, not 4 March. Now read day-first.
+- **Files with one signed amount column** instead of separate debit and credit are split correctly.
+- **Files that record only a posting date** — SAP does this — now use it as the entry date rather than being refused.
+- **No upload can produce a blank server error any more.** A file that genuinely cannot be read gets told why: *"This file does not look like a ledger CA-Guard can read: could not find a voucher number, a date. Columns recognised: Amount, Debit."* I tested it against nonsense files, wrong-shaped files, half-truncated files and empty files — every one returns a readable explanation.
+
+**Tests/checks:** ruff clean, pyright 0 errors, **464 tests passing** (22 new ones covering exactly this). Verified end to end in the browser with a Tally-style export: 431 vouchers read, 24 findings raised, caveats displayed.
+
+**Founder decision needed:** none. **Cost:** ₹0.
+
+**Worth saying:** this is the second time a bug has come from testing only against data CA-Guard generated itself. The first was the ledger that did not balance. Both were found by looking at the thing the way a real user would. The outstanding CA review in `docs/ca_validation/` is the same kind of check, and still worth getting.
