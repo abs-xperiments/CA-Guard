@@ -8,7 +8,7 @@ Two paths, and they are not the same product.
 | Data | Real client ledgers | **Synthetic only** |
 | Privacy claim | Nothing leaves the machine | None — it is a demonstration |
 | Cost | ₹0 | Monthly hosting |
-| Status | ✅ Built and tested | ⏸ **Not built.** Awaiting a founder decision. |
+| Status | ✅ Built and tested | ✅ **Prepared.** Steps below; not deployed. |
 
 The distinction is not marketing. D-005 exists because calling a cloud-hosted demo "on-premise" would be untrue, and a CA relying on that sentence would be misled about where their client's data sits.
 
@@ -136,21 +136,15 @@ Railway containers have ephemeral disks. **Without a volume mounted at `/data`, 
 2. Generate a demonstration ledger locally with `caguard generate` and upload that.
 3. **Never upload a real client ledger.** The banner says so; it is on you as well.
 
-## Public demo — a decision, not a default
+---
 
-**Nothing is deployed and nothing has been spent.** Founder direction C-1 was explicit: keep development at ₹0 and revisit hosting only once the product works. It now works, so the decision is live.
+## Why the two paths stay separate
 
-### What deploying would mean
+A local Docker demonstration with a screen recording costs nothing and shows the
+same product — and for a faculty review it is arguably the more honest artefact,
+because a local install *is* what CA-Guard is designed to be. A hosted demo buys
+one thing the recording cannot: somebody can try it themselves without
+installing anything.
 
-- **Railway Hobby, $5/month.** The free plan is 1 vCPU and 0.5 GB of RAM, which will not run this stack.
-- **Synthetic data only**, permanently. `caguard generate` produces the demonstration ledger.
-- **A password gate is mandatory.** A public URL is public: without one, strangers can upload files and consume the machine.
-- **The wording must stay honest.** The demo page has to say it is a demonstration on synthetic data, and that the privacy claim applies to the self-hosted path. That is D-005 and it is not negotiable.
-
-### The alternative, at ₹0
-
-A local Docker demonstration with a screen recording. For a faculty review, a conference or a portfolio, this shows the same product and costs nothing. It is also more honest, because it is the deployment the product is actually designed for.
-
-### What is needed to proceed
-
-A founder decision, and then a Railway account. Nothing in the repository has to change first — the image already runs, and the API already refuses non-loopback binds, so the deployment would need a deliberate configuration change rather than an accident.
+Both are legitimate. What is not legitimate is letting the hosted one imply the
+privacy claim that belongs to the other, which is why the banner is not optional.
