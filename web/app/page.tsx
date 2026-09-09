@@ -10,13 +10,14 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FileUp, FolderOpen, ShieldCheck } from "lucide-react";
-import { api, ApiError } from "@/lib/api";
-import type { Engagement } from "@/lib/types";
+import { FileUp, FolderOpen, LogOut, ShieldCheck } from "lucide-react";
+import { ApiError, api, auth } from "@/lib/api";
+import type { Engagement, User } from "@/lib/types";
 import { Button, EmptyState, ErrorState, Spinner } from "@/components/ui";
 
 export default function Home() {
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
   const [engagements, setEngagements] = useState<Engagement[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -26,12 +27,19 @@ export default function Home() {
   const load = useCallback(async () => {
     setError(null);
     try {
+      setUser(await auth.me());
+    } catch {
+      // Not signed in, or the session has expired. Both mean: sign in.
+      router.replace("/login");
+      return;
+    }
+    try {
       setEngagements(await api.engagements());
     } catch (caught) {
       setEngagements([]);
       setError(caught instanceof ApiError ? caught.message : "Cannot reach CA-Guard.");
     }
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     void load();
@@ -54,9 +62,29 @@ export default function Home() {
   return (
     <main className="mx-auto max-w-3xl px-6 py-16">
       <header className="mb-10">
-        <div className="flex items-center gap-2 text-accent">
-          <ShieldCheck size={20} />
-          <span className="text-sm font-semibold tracking-tight">CA-Guard</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-accent">
+            <ShieldCheck size={20} />
+            <span className="text-sm font-semibold tracking-tight">CA-Guard</span>
+          </div>
+          {user ? (
+            <div className="flex items-center gap-3">
+              <div className="text-right">
+                <p className="text-[12px] font-medium text-ink">{user.display_name}</p>
+                <p className="text-[11px] text-ink-faint">{user.email}</p>
+              </div>
+              <Button
+                variant="quiet"
+                title="Sign out"
+                onClick={async () => {
+                  await auth.logout().catch(() => undefined);
+                  router.replace("/login");
+                }}
+              >
+                <LogOut size={14} />
+              </Button>
+            </div>
+          ) : null}
         </div>
         <h1 className="mt-3 text-2xl font-semibold tracking-tight text-ink">
           Open a ledger for review

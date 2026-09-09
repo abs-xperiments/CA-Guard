@@ -21,6 +21,8 @@ interface Props {
   findings: Finding[];
   selected: string | null;
   cursor: number;
+  /** Vouchers decided moments ago, held in place so the change is visible. */
+  settling: Set<string>;
   onSelect: (voucherId: string) => void;
   onCursorChange: (index: number) => void;
 }
@@ -29,6 +31,7 @@ export function FindingsTable({
   findings,
   selected,
   cursor,
+  settling,
   onSelect,
   onCursorChange,
 }: Props) {
@@ -57,6 +60,9 @@ export function FindingsTable({
           {findings.map((finding, index) => {
             const isSelected = finding.voucher_id === selected;
             const isCursor = index === cursor;
+            // A single confirming flash. The reported problem was that deciding
+            // looked like nothing had happened until the row silently vanished.
+            const justDecided = settling.has(finding.voucher_id);
             return (
               <tr
                 key={finding.voucher_id}
@@ -70,11 +76,13 @@ export function FindingsTable({
                 aria-selected={isSelected}
                 className={cx(
                   "animate-row cursor-pointer border-b border-line/70 transition-colors duration-100",
-                  isSelected
-                    ? "bg-accent-soft"
-                    : isCursor
-                      ? "bg-canvas"
-                      : "hover:bg-canvas/70",
+                  justDecided
+                    ? "animate-confirm"
+                    : isSelected
+                      ? "bg-accent-soft"
+                      : isCursor
+                        ? "bg-canvas"
+                        : "hover:bg-canvas/70",
                 )}
                 style={{ animationDelay: `${Math.min(index, 12) * 12}ms` }}
               >

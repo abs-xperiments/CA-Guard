@@ -209,3 +209,44 @@ def test_engagement_derives_its_name_from_the_ledger(lines) -> None:
     assert "ACME-IN" in built.name
     assert "FY2024-25" in built.name
     assert built.voucher_count > 0
+
+
+# --- undoing a decision -------------------------------------------------------
+
+
+def test_undoing_a_decision_adds_an_entry_rather_than_removing_one(
+    store: ReviewStore, engagement: Engagement
+) -> None:
+    """The interface offers "Undo" after a decision. This is what that means.
+
+    Undo cannot delete: the trail is append-only. It records a further decision
+    that reopens the finding, so the fact that somebody changed their mind is
+    itself preserved — which is the honest behaviour and also what an engagement
+    quality reviewer would expect to see.
+    """
+    store.record(decision(engagement, action=ReviewAction.ACCEPT))
+    store.record(
+        decision(
+            engagement,
+            action=ReviewAction.INVESTIGATE,
+            note="Reopened after being accepted",
+        )
+    )
+
+    trail = store.trail(engagement.id, "V000001")
+    assert [d.action for d in trail] == [ReviewAction.ACCEPT, ReviewAction.INVESTIGATE]
+    assert store.current(engagement.id)["V000001"].action is ReviewAction.INVESTIGATE
+    assert "Reopened" in (trail[-1].note or "")
+
+
+def test_the_trail_shows_every_change_of_mind(store: ReviewStore, engagement: Engagement) -> None:
+    for action, note in (
+        (ReviewAction.ACCEPT, None),
+        (ReviewAction.INVESTIGATE, "Reopened after being accepted"),
+        (ReviewAction.REJECT, "Checked against the signed lease agreement"),
+    ):
+        store.record(decision(engagement, action=action, note=note))
+
+    assert len(store.trail(engagement.id, "V000001")) == 3
+    assert store.counts(engagement.id)[ReviewAction.REJECT] == 1
+    assert store.counts(engagement.id)[ReviewAction.ACCEPT] == 0

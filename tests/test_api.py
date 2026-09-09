@@ -28,7 +28,23 @@ def ledger_csv() -> bytes:
 
 @pytest.fixture
 def client(tmp_path: Path) -> TestClient:
-    return TestClient(create_app(tmp_path / "review.db"))
+    """A signed-in client.
+
+    Every route that touches a ledger requires a session, so the fixture creates
+    the first account. That the routes are actually protected is asserted in
+    `test_auth.py`, not re-asserted here.
+    """
+    client = TestClient(create_app(tmp_path / "review.db"))
+    response = client.post(
+        "/api/auth/signup",
+        json={
+            "email": "reviewer@example.com",
+            "name": "Reviewer",
+            "password": "a-long-enough-passphrase",
+        },
+    )
+    assert response.status_code == 200, response.text
+    return client
 
 
 @pytest.fixture
@@ -108,7 +124,7 @@ def test_recording_a_decision(client: TestClient, opened: dict) -> None:
     voucher = opened["findings"][0]["voucher_id"]
     response = client.post(
         f"/api/engagements/{engagement}/decisions",
-        json={"voucher_id": voucher, "action": "accept", "reviewer": "abirami"},
+        json={"voucher_id": voucher, "action": "accept"},
     )
     assert response.status_code == 200, response.text
     assert response.json()["sequence"] == 1
@@ -124,7 +140,7 @@ def test_rejecting_without_a_reason_is_refused(client: TestClient, opened: dict)
     voucher = opened["findings"][0]["voucher_id"]
     response = client.post(
         f"/api/engagements/{engagement}/decisions",
-        json={"voucher_id": voucher, "action": "reject", "reviewer": "abirami"},
+        json={"voucher_id": voucher, "action": "reject"},
     )
     assert response.status_code == 422
     assert "needs a reason" in response.json()["detail"]
@@ -134,8 +150,8 @@ def test_the_trail_keeps_a_change_of_mind(client: TestClient, opened: dict) -> N
     engagement = opened["engagement"]["id"]
     voucher = opened["findings"][0]["voucher_id"]
     for payload in (
-        {"action": "investigate", "reviewer": "abirami"},
-        {"action": "reject", "reviewer": "abirami", "note": "Traced to the signed lease"},
+        {"action": "investigate"},
+        {"action": "reject", "note": "Traced to the signed lease"},
     ):
         client.post(
             f"/api/engagements/{engagement}/decisions",

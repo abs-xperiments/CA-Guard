@@ -554,3 +554,50 @@ Nothing in the code needs to change for either. `docs/deploy.md` has the detail.
 **Credentials needed:** none, unless you choose Option B, in which case a Railway account.
 
 **Still outstanding:** the CA validation pack from Phase 1. It remains the only outside check on whether the synthetic ledger looks like a real book, and two of the more embarrassing bugs this project has had were realism faults a practitioner would have spotted immediately.
+
+---
+
+## 2026-09-09 — [PHASE 8] Accounts, and fixing the thing you reported: pressing Accept looked like nothing happened.
+
+**What you reported:** clicking accept, reject or investigate worked, but nothing on screen told you it had. You pressed a button and the row just eventually disappeared.
+
+**You were right, and it was worse than cosmetic.** The row vanished because the default filter hides reviewed items — so the only feedback was a row silently going away, which reads like a bug rather than a confirmation.
+
+**What I did about it.** I looked into how consumer apps handle this, and the pattern they've converged on is consistent: **act immediately, confirm briefly, and offer an undo** — rather than asking "are you sure?" before every click. The rule of thumb is that friction should match how hard something is to reverse.
+
+That turns out to fit CA-Guard unusually well. **Undo here isn't deletion.** The audit trail can never be edited, so undoing records a *further* decision that reopens the finding. The change of mind is preserved, which is exactly what an audit reviewer would want to see. The pleasant behaviour and the honest one are the same thing.
+
+Pressing a decision now does four things:
+1. **The button changes to a tick reading "Done"** — immediately, before anything moves.
+2. **The row flashes green once** and stays put for about a second, so a decision isn't a row disappearing.
+3. **A message slides up** saying what happened, what it means for the report, and offering **Undo** for six seconds.
+4. **The queue moves to the next unreviewed item**, because that's what you actually want next.
+
+Rejecting keeps its friction — it still needs a typed reason, and it's deliberately not a single keystroke, because it's the judgement someone will question later.
+
+**Other things borrowed from the same research:**
+- **Loading placeholders shaped like the content**, instead of a spinner. The page no longer jumps when the queue arrives.
+- **The progress bar actually moves now**, and turns green when everything's reviewed.
+- **The "all done" screen offers the report**, rather than just saying the list is empty.
+- **Error messages say what did *not* happen** — "Nothing was saved" — because after a failed click your first question is whether it half-worked.
+- **All animation switches off** if your system is set to reduce motion. The confirmation still works without it.
+
+---
+
+**And the bigger thing you asked for: proper accounts.**
+
+Before this, the reviewer's name came from a **text box on the page**. Anyone could type anyone's name. That isn't an audit trail — it's a suggestion, and a client is entitled to better. I hadn't spotted it; you were right to ask.
+
+There's now a sign-up and sign-in, and **the name recorded against every decision comes from who is actually signed in.** The field has been removed from the API entirely, so a request that tries to send someone else's name is rejected outright rather than quietly believed.
+
+Everything stays local — accounts live in the same single file as the decisions, so a firm still backs up one file, and no outside service is involved. Passwords are properly hashed with a memory-hard function (deliberately using something already in Python rather than adding another dependency). Sessions are signed cookies a script can't read, and the signing key is created automatically on first run, so **you don't need to invent or give me any secret.**
+
+**Who can sign up:** the first account on a fresh install becomes the administrator — someone has to be able to get in. After that it needs an invite code, because a public URL with open sign-up means strangers uploading files and running up the bill. The code is generated automatically for a local install, or set through a setting for a deployment.
+
+Every page that touches a ledger now requires signing in. I checked each one individually — the test asserts a 401 on all of them, because a route someone forgets to protect is the one that leaks.
+
+**Tests/checks:** ruff clean, pyright 0 errors, **529 tests passing** (46 new on accounts alone), TypeScript clean, web build succeeds. I verified the sign-up page and flow in a browser; I stopped short of clicking through the decision buttons there because you interrupted the browser session, so that part is verified by the build and the underlying tests rather than by me watching it happen. Worth you trying it.
+
+**Credentials needed: none.** Everything generates itself. For the Railway deployment you'll want to set one invite code, which I've put in the steps below.
+
+**Next:** deployment steps for you — everything else is done.

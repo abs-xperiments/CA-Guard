@@ -150,7 +150,7 @@ class DecisionIn(BaseModel):
 
     voucher_id: str = Field(min_length=1)
     action: ReviewAction
-    reviewer: str = Field(min_length=1, default="reviewer")
+    # Deliberately absent: the reviewer comes from the signed-in session.
     note: str | None = None
     adjusted_band: RiskBand | None = None
 

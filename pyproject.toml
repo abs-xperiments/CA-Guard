@@ -48,6 +48,11 @@ ignore = ["RUF001", "RUF002", "RUF003"]  # ambiguous unicode: ₹ and en dashes 
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["ARG"]
+# FastAPI expresses dependencies as call-valued argument defaults, and a
+# dependency whose value the handler does not read is still doing its job — the
+# `user` argument on a protected route exists to enforce the session, not to be
+# used. Fighting the framework here would make the code worse, not safer.
+"src/caguard/api/*" = ["ARG001", "B008"]
 
 [tool.pyright]
 include = ["src", "tests"]

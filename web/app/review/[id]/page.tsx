@@ -4,70 +4,84 @@
  * The review workspace.
  *
  * A ranked queue on the left, the evidence behind the selected finding on the
- * right. Fully keyboard-driven, because a CA working through a hundred findings
- * should never have to reach for the mouse: j/k to move, Enter to open, a/r/i
- * to decide, Esc to close.
+ * right. Fully keyboard-driven: j/k to move, Enter to open, a/i to decide,
+ * Esc to close.
+ *
+ * Two things here came out of using it rather than testing it. The header
+ * counters are derived from the findings on screen, because reading a
+ * load-time snapshot meant the progress bar never moved. And a row that has
+ * just been decided flashes once and stays visible for a beat before the
+ * filter removes it — otherwise a decision looks like a row vanishing for no
+ * reason.
  */
 
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Download, Inbox, ShieldCheck } from "lucide-react";
-import { api, ApiError } from "@/lib/api";
-import type { Decision, Finding, Queue, RiskBand } from "@/lib/types";
-import { concernLabel } from "@/lib/types";
+import { useRouter } from "next/navigation";
+import { ArrowLeft, Download, Inbox, LogOut, ShieldCheck } from "lucide-react";
+import { ApiError, api, auth } from "@/lib/api";
+import type { Decision, Finding, Queue, RiskBand, User } from "@/lib/types";
 import { EvidenceDrawer } from "@/components/EvidenceDrawer";
 import { FindingsTable } from "@/components/FindingsTable";
 import { IntakeNotice } from "@/components/IntakeNotice";
-import { Button, EmptyState, ErrorState, Key, Spinner, Stat, cx } from "@/components/ui";
+import { QueueSkeleton } from "@/components/Skeleton";
+import { useToast } from "@/components/Toast";
+import { Button, EmptyState, ErrorState, Key, Stat, cx } from "@/components/ui";
 
 type BandFilter = RiskBand | "all";
 type StatusFilter = "all" | "open" | "reviewed";
 
+/** How long a just-decided row stays visible before the filter removes it. */
+const SETTLE_MS = 1100;
+
 export default function ReviewPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
+  const toast = useToast();
 
+  const [user, setUser] = useState<User | null>(null);
   const [queue, setQueue] = useState<Queue | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [cursor, setCursor] = useState(0);
   const [band, setBand] = useState<BandFilter>("all");
   const [status, setStatus] = useState<StatusFilter>("open");
-  const [reviewer, setReviewer] = useState("reviewer");
+  //: Vouchers decided moments ago. Kept in the list briefly so the decision is
+  //: visibly acknowledged before the row leaves.
+  const [settling, setSettling] = useState<Set<string>>(new Set());
 
   const load = useCallback(async () => {
     setError(null);
+    try {
+      setUser(await auth.me());
+    } catch {
+      router.replace("/login");
+      return;
+    }
     try {
       setQueue(await api.queue(id));
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : "Could not load the review.");
     }
-  }, [id]);
+  }, [id, router]);
 
   useEffect(() => {
     void load();
   }, [load]);
-
-  useEffect(() => {
-    const saved = window.localStorage.getItem("ca-guard-reviewer");
-    if (saved) setReviewer(saved);
-  }, []);
 
   const visible = useMemo(() => {
     if (!queue) return [];
     return queue.findings.filter((finding) => {
       if (band !== "all" && finding.band !== band) return false;
       const open = finding.status === "not yet reviewed";
-      if (status === "open" && !open) return false;
+      if (status === "open" && !open && !settling.has(finding.voucher_id)) return false;
       if (status === "reviewed" && open) return false;
       return true;
     });
-  }, [queue, band, status]);
+  }, [queue, band, status, settling]);
 
   const reviewed = useMemo(
-    () =>
-      queue
-        ? queue.findings.filter((f) => f.status !== "not yet reviewed").length
-        : 0,
+    () => (queue ? queue.findings.filter((f) => f.status !== "not yet reviewed").length : 0),
     [queue],
   );
 
@@ -76,7 +90,6 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
     ? (queue?.findings.find((f) => f.voucher_id === selected) ?? null)
     : null;
 
-  // Keep the cursor inside the list when filters change under it.
   useEffect(() => {
     setCursor((previous) => Math.min(previous, Math.max(visible.length - 1, 0)));
   }, [visible.length]);
@@ -99,19 +112,42 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
           }
         : previous,
     );
+
+    // Hold the row in place just long enough to see it change.
+    setSettling((previous) => new Set(previous).add(decision.voucher_id));
+    window.setTimeout(() => {
+      setSettling((previous) => {
+        const next = new Set(previous);
+        next.delete(decision.voucher_id);
+        return next;
+      });
+    }, SETTLE_MS);
   }, []);
 
-  // Keyboard navigation. Ignored while typing, so a note can contain "a".
+  /** Move to the next finding in the queue. Returns false when there is none. */
+  const advance = useCallback((): boolean => {
+    const remaining = visible.filter(
+      (finding) =>
+        finding.voucher_id !== selected && finding.status === "not yet reviewed",
+    );
+    const next = remaining[0];
+    if (!next) return false;
+    setSelected(next.voucher_id);
+    setCursor(visible.findIndex((f) => f.voucher_id === next.voucher_id));
+    return true;
+  }, [visible, selected]);
+
+  // Queue-level keyboard navigation. Decisions from inside the drawer are
+  // handled there, so a keystroke is never claimed twice.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
       const target = event.target as HTMLElement | null;
       if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
 
       if (event.key === "Escape") {
         setSelected(null);
-        return;
-      }
-      if (event.key === "j" || event.key === "ArrowDown") {
+      } else if (event.key === "j" || event.key === "ArrowDown") {
         event.preventDefault();
         setCursor((c) => Math.min(c + 1, Math.max(visible.length - 1, 0)));
       } else if (event.key === "k" || event.key === "ArrowUp") {
@@ -119,22 +155,16 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
         setCursor((c) => Math.max(c - 1, 0));
       } else if (event.key === "Enter" && current) {
         setSelected(current.voucher_id);
-      } else if (["a", "i"].includes(event.key) && current) {
-        // Reject is deliberately not a bare keystroke: it needs a reason, and
-        // the reason belongs in the drawer where the reviewer can type it.
-        void api
-          .decide(id, {
-            voucher_id: current.voucher_id,
-            action: event.key === "a" ? "accept" : "investigate",
-            reviewer,
-          })
-          .then(applyDecision)
-          .catch(() => undefined);
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [visible.length, current, id, reviewer, applyDecision]);
+  }, [visible.length, current]);
+
+  async function signOut() {
+    await auth.logout().catch(() => undefined);
+    router.replace("/login");
+  }
 
   if (error) {
     return (
@@ -151,13 +181,19 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
 
   if (!queue) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
-        <Spinner label="Loading the review queue…" />
-      </main>
+      <div className="flex h-screen flex-col">
+        <header className="shrink-0 border-b border-line bg-surface px-5 py-4">
+          <div className="h-4 w-56 animate-pulse-soft rounded bg-line" />
+        </header>
+        <div className="flex-1 px-5 py-4">
+          <QueueSkeleton />
+        </div>
+      </div>
     );
   }
 
   const progress = queue.flagged ? reviewed / queue.flagged : 0;
+  const allDone = reviewed === queue.flagged && queue.flagged > 0;
 
   return (
     <div className="flex h-screen flex-col">
@@ -189,7 +225,7 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
             <Stat
               label="Reviewed"
               value={`${reviewed} of ${queue.flagged}`}
-              tone="text-ink"
+              tone={allDone ? "text-rejected" : "text-ink"}
             />
           </dl>
 
@@ -198,11 +234,28 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
               <Download size={14} /> Report
             </Button>
           </a>
+
+          {user ? (
+            <div className="flex items-center gap-2 border-l border-line pl-3">
+              <div className="text-right">
+                <p className="text-[12px] font-medium text-ink">{user.display_name}</p>
+                <p className="text-[11px] text-ink-faint">
+                  decisions signed as this account
+                </p>
+              </div>
+              <Button variant="quiet" onClick={() => void signOut()} title="Sign out">
+                <LogOut size={14} />
+              </Button>
+            </div>
+          ) : null}
         </div>
 
         <div className="mt-2.5 h-1 overflow-hidden rounded-full bg-line">
           <div
-            className="h-full rounded-full bg-accent transition-[width] duration-500"
+            className={cx(
+              "h-full rounded-full transition-[width] duration-500",
+              allDone ? "bg-rejected" : "bg-accent",
+            )}
             style={{ width: `${Math.round(progress * 100)}%` }}
           />
         </div>
@@ -233,24 +286,15 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
               onChange={(value) => setStatus(value as StatusFilter)}
             />
 
-            <label className="ml-auto flex items-center gap-2 text-[12px] text-ink-muted">
-              Reviewer
-              <input
-                value={reviewer}
-                onChange={(event) => {
-                  setReviewer(event.target.value);
-                  window.localStorage.setItem("ca-guard-reviewer", event.target.value);
-                }}
-                className="w-28 rounded border border-line bg-surface px-2 py-1 text-[13px] text-ink focus:border-accent focus:outline-none"
-              />
-            </label>
-
-            <div className="flex items-center gap-1 text-[11px] text-ink-faint">
+            <div className="ml-auto flex items-center gap-1 text-[11px] text-ink-faint">
               <Key>j</Key>
               <Key>k</Key>
               <span>move</span>
               <Key>↵</Key>
               <span>open</span>
+              <Key>a</Key>
+              <Key>i</Key>
+              <span>decide</span>
             </div>
           </div>
 
@@ -260,14 +304,27 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
               <EmptyState
                 icon={<Inbox size={22} />}
                 title={
-                  status === "open"
-                    ? "Nothing left to review"
-                    : "No findings match these filters"
+                  allDone
+                    ? "Every finding has been reviewed"
+                    : status === "open"
+                      ? "Nothing left to review"
+                      : "No findings match these filters"
                 }
                 detail={
-                  status === "open"
-                    ? `Every one of the ${queue.flagged} findings has a recorded decision. Open the report to see them together.`
-                    : "Widen the risk or status filter to see more."
+                  allDone
+                    ? `All ${queue.flagged} findings carry a recorded decision. Open the report to see them together.`
+                    : status === "open"
+                      ? "Every finding has a recorded decision."
+                      : "Widen the risk or status filter to see more."
+                }
+                action={
+                  allDone ? (
+                    <a href={api.reportUrl(id, "html")} target="_blank" rel="noreferrer">
+                      <Button variant="primary">
+                        <Download size={14} /> Open the report
+                      </Button>
+                    </a>
+                  ) : null
                 }
               />
             ) : (
@@ -275,6 +332,7 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
                 findings={visible}
                 selected={selected}
                 cursor={cursor}
+                settling={settling}
                 onSelect={setSelected}
                 onCursorChange={setCursor}
               />
@@ -286,9 +344,9 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
           <EvidenceDrawer
             engagementId={id}
             finding={openFinding}
-            reviewer={reviewer}
             onClose={() => setSelected(null)}
             onDecided={applyDecision}
+            onAdvance={advance}
           />
         ) : null}
       </div>
@@ -329,6 +387,3 @@ function Filters({
     </div>
   );
 }
-
-/** Kept for a future filter-by-concern control; already used for labels. */
-export const conceptLabel = concernLabel;

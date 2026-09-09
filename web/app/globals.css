@@ -67,11 +67,40 @@
     0%, 100% { opacity: 1; }
     50%      { opacity: 0.45; }
   }
+  @keyframes toast-in {
+    from { transform: translateY(10px) scale(0.98); opacity: 0; }
+    to   { transform: translateY(0) scale(1);       opacity: 1; }
+  }
+  @keyframes toast-out {
+    to { transform: translateY(6px); opacity: 0; }
+  }
+  /* A single confirming pulse on the row a decision was just recorded against.
+     The reported problem was that pressing Accept looked like nothing happened. */
+  @keyframes confirm {
+    0%   { background-color: rgb(6 118 71 / 0.16); }
+    100% { background-color: transparent; }
+  }
+  @keyframes shimmer {
+    100% { transform: translateX(100%); }
+  }
+
   .animate-drawer { animation: slide-in 180ms cubic-bezier(0.2, 0, 0, 1); }
+  .animate-toast { animation: toast-in 200ms cubic-bezier(0.2, 0, 0, 1); }
+  .animate-toast-out { animation: toast-out 200ms ease-in forwards; }
+  .animate-confirm { animation: confirm 1100ms ease-out; }
+  .animate-shimmer::after {
+    content: "";
+    position: absolute; inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.6), transparent);
+    animation: shimmer 1.4s infinite;
+  }
   .animate-row    { animation: fade-up 140ms ease-out both; }
   .animate-pulse-soft { animation: pulse-soft 1.4s ease-in-out infinite; }
 
   @media (prefers-reduced-motion: reduce) {
-    .animate-drawer, .animate-row, .animate-pulse-soft { animation: none; }
+    .animate-drawer, .animate-row, .animate-pulse-soft,
+    .animate-toast, .animate-toast-out, .animate-confirm { animation: none; }
+    .animate-shimmer::after { animation: none; }
   }
 }

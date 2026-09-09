@@ -5,7 +5,16 @@
  * machine, so nothing needs CORS opened up and no request ever leaves the box.
  */
 
-import type { Decision, Engagement, Explanation, Finding, Queue, ReviewAction } from "./types";
+import type {
+  Decision,
+  Engagement,
+  Explanation,
+  Finding,
+  Queue,
+  ReviewAction,
+  SignupState,
+  User,
+} from "./types";
 
 export class ApiError extends Error {
   constructor(
@@ -39,6 +48,33 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+export const auth = {
+  me: () => request<User>("/api/auth/me"),
+
+  signupState: () => request<SignupState>("/api/auth/signup-state"),
+
+  signup: (body: {
+    email: string;
+    name: string;
+    password: string;
+    invite_code?: string;
+  }) =>
+    request<User>("/api/auth/signup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    }),
+
+  login: (email: string, password: string) =>
+    request<User>("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    }),
+
+  logout: () => request<{ ok: boolean }>("/api/auth/logout", { method: "POST" }),
+};
+
 export const api = {
   health: () =>
     request<{ status: string; model: string; model_available: boolean }>("/api/health"),
@@ -61,7 +97,9 @@ export const api = {
 
   decide: (
     id: string,
-    payload: { voucher_id: string; action: ReviewAction; reviewer: string; note?: string },
+    // No reviewer field: the server takes it from the signed-in session, so a
+    // decision cannot be attributed to somebody who did not make it.
+    payload: { voucher_id: string; action: ReviewAction; note?: string },
   ) =>
     request<Decision>(`/api/engagements/${id}/decisions`, {
       method: "POST",

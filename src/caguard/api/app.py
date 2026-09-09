@@ -19,9 +19,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException, UploadFile
+from fastapi import Depends, FastAPI, HTTPException, UploadFile
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
+from caguard.api.auth_routes import build_auth_router, current_user_dependency
 from caguard.api.models import (
     DecisionIn,
     DecisionOut,
@@ -31,6 +32,9 @@ from caguard.api.models import (
     IntakeReportOut,
     QueueOut,
 )
+from caguard.auth import UserStore
+from caguard.auth.sessions import load_or_create_key
+from caguard.auth.users import User
 from caguard.detect.types import DetectorConfig
 from caguard.explain.ollama import OllamaProvider
 from caguard.explain.service import ExplanationService
@@ -120,12 +124,23 @@ def create_app(
     workspace = Workspace(
         store=ReviewStore(store_path), config=config or DetectorConfig(), model=model
     )
+    data_dir = Path(store_path).parent
+    users = UserStore(store_path)
+    signing_key = load_or_create_key(data_dir)
+
     app = FastAPI(
         title="CA-Guard",
         summary="Private review workspace for Indian Chartered Accountants",
         version="0.1.0",
     )
     app.state.workspace = workspace
+    app.state.users = users
+    app.include_router(build_auth_router(users, data_dir, signing_key))
+
+    # Every route below touches a client's ledger, so every one of them requires
+    # a signed-in user. Applied as a dependency rather than remembered per route,
+    # because a route someone forgets to protect is the one that leaks.
+    signed_in = Depends(current_user_dependency(users, signing_key))
 
     @app.get("/api/health")
     def health() -> dict[str, object]:
@@ -137,11 +152,11 @@ def create_app(
         }
 
     @app.get("/api/engagements", response_model=list[EngagementOut])
-    def list_engagements() -> list[EngagementOut]:
+    def list_engagements(user: User = signed_in) -> list[EngagementOut]:
         return [EngagementOut.build(e) for e in workspace.store.engagements()]
 
     @app.post("/api/engagements", response_model=QueueOut)
-    async def upload(file: UploadFile) -> QueueOut:
+    async def upload(file: UploadFile, user: User = signed_in) -> QueueOut:
         """Upload a ledger, analyse it, and return the review queue."""
         payload = await file.read()
         if len(payload) > MAX_UPLOAD_BYTES:
@@ -187,14 +202,14 @@ def create_app(
         return _queue(workspace, analysis)
 
     @app.get("/api/engagements/{engagement_id}/queue", response_model=QueueOut)
-    def queue(engagement_id: str) -> QueueOut:
+    def queue(engagement_id: str, user: User = signed_in) -> QueueOut:
         return _queue(workspace, workspace.require(engagement_id))
 
     @app.get(
         "/api/engagements/{engagement_id}/findings/{voucher_id}",
         response_model=FindingOut,
     )
-    def finding(engagement_id: str, voucher_id: str) -> FindingOut:
+    def finding(engagement_id: str, voucher_id: str, user: User = signed_in) -> FindingOut:
         analysis = workspace.require(engagement_id)
         found = analysis.by_voucher.get(voucher_id)
         if found is None:
@@ -206,7 +221,7 @@ def create_app(
         "/api/engagements/{engagement_id}/findings/{voucher_id}/explanation",
         response_model=ExplanationOut,
     )
-    def explanation(engagement_id: str, voucher_id: str) -> ExplanationOut:
+    def explanation(engagement_id: str, voucher_id: str, user: User = signed_in) -> ExplanationOut:
         """Plain-language explanation. Always returns text, model or not."""
         analysis = workspace.require(engagement_id)
         found = analysis.by_voucher.get(voucher_id)
@@ -224,7 +239,7 @@ def create_app(
         )
 
     @app.post("/api/engagements/{engagement_id}/decisions", response_model=DecisionOut)
-    def decide(engagement_id: str, body: DecisionIn) -> DecisionOut:
+    def decide(engagement_id: str, body: DecisionIn, user: User = signed_in) -> DecisionOut:
         analysis = workspace.require(engagement_id)
         if body.voucher_id not in analysis.by_voucher:
             raise HTTPException(404, f"No finding for voucher {body.voucher_id!r}")
@@ -233,7 +248,9 @@ def create_app(
                 engagement_id=engagement_id,
                 voucher_id=body.voucher_id,
                 action=body.action,
-                reviewer=body.reviewer,
+                # From the session, never the request body: an audit trail
+                # anyone can sign with anyone's name is not an audit trail.
+                reviewer=user.display_name,
                 note=body.note,
                 adjusted_band=body.adjusted_band,
             )
@@ -243,12 +260,14 @@ def create_app(
         return DecisionOut.build(workspace.store.record(decision))
 
     @app.get("/api/engagements/{engagement_id}/trail", response_model=list[DecisionOut])
-    def trail(engagement_id: str, voucher_id: str | None = None) -> list[DecisionOut]:
+    def trail(
+        engagement_id: str, voucher_id: str | None = None, user: User = signed_in
+    ) -> list[DecisionOut]:
         """The full audit trail, oldest first. Nothing is ever removed from it."""
         return [DecisionOut.build(d) for d in workspace.store.trail(engagement_id, voucher_id)]
 
     @app.get("/api/engagements/{engagement_id}/report.csv")
-    def report_csv(engagement_id: str) -> PlainTextResponse:
+    def report_csv(engagement_id: str, user: User = signed_in) -> PlainTextResponse:
         analysis = workspace.require(engagement_id)
         rows = build_rows(analysis.findings, workspace.store.current(engagement_id))
         return PlainTextResponse(
@@ -260,7 +279,7 @@ def create_app(
         )
 
     @app.get("/api/engagements/{engagement_id}/report.html")
-    def report_html(engagement_id: str) -> HTMLResponse:
+    def report_html(engagement_id: str, user: User = signed_in) -> HTMLResponse:
         analysis = workspace.require(engagement_id)
         rows = build_rows(analysis.findings, workspace.store.current(engagement_id))
         return HTMLResponse(to_html(analysis.engagement, rows))

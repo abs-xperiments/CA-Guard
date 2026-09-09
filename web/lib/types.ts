@@ -49,6 +49,22 @@ export interface Engagement {
   opened_at: string;
 }
 
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  display_name: string;
+  is_admin: boolean;
+  created_at: string;
+}
+
+export interface SignupState {
+  state: "bootstrap" | "invite_only";
+  needs_invite: boolean;
+  explanation: string;
+  any_users: boolean;
+}
+
 export interface IntakeReport {
   summary: string;
   mapped: Record<string, string>;

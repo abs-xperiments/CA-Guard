@@ -48,3 +48,7 @@
 | D-044 | Upload filenames are matched against a suffix allowlist, never trusted. | Decided | Path.suffix does not sanitise Windows-style paths on POSIX; the API was building a temp path from one. |
 | D-045 | The container never publishes the analysis API; only the workspace is reachable. | Decided | A mistaken port mapping must not be able to expose ledger endpoints. |
 | D-046 | Public deployment remains unbuilt pending a founder decision. | Open (founder) | C-1: ₹0 during development. The product now works, so the decision is live. docs/deploy.md. |
+| D-047 | Reviewers have accounts; the name on a decision comes from the session, never the request body. | Decided | A trail anyone could sign with anyone's name is not a trail. DecisionIn no longer has a reviewer field. |
+| D-048 | Decisions are optimistic with an undo, not confirmation dialogs. | Decided | Undo is honest here: the trail is append-only, so undoing records a further decision rather than erasing one. ADR-0008. |
+| D-049 | Signup is open for the first account and invite-only after that. | Decided | A public URL with open signup is strangers uploading files and running up the bill. |
+| D-050 | Passwords are scrypt-hashed with a stdlib implementation; no new dependency. | Decided | Memory-hard and adequate for a self-hosted audit tool; Argon2 would add a compiled package. |
