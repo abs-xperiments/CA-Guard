@@ -15,6 +15,7 @@ there is nothing to persist and nothing that can drift.
 from __future__ import annotations
 
 import io
+import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -149,6 +150,11 @@ def create_app(
             "model": workspace.model,
             "model_available": workspace.model_available(),
             "engagements_loaded": len(workspace.analyses),
+            # Set on a hosted deployment so the interface can say plainly that it
+            # is a demonstration on synthetic data. The privacy claim belongs to
+            # the self-hosted path, and wording that blurs the two would mislead
+            # a CA about where their client's ledger sits (D-005).
+            "demo_mode": os.environ.get("CAGUARD_DEMO", "").strip().lower() in {"1", "true", "yes"},
         }
 
     @app.get("/api/engagements", response_model=list[EngagementOut])

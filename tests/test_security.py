@@ -222,3 +222,40 @@ def test_the_image_defaults_to_no_model() -> None:
     """A firm installing CA-Guard gets a working product with nothing else."""
     assert "CAGUARD_MODEL: ${CAGUARD_MODEL:-none}" in (ROOT / "compose.yaml").read_text()
     assert "CAGUARD_MODEL=none" in (ROOT / "Dockerfile").read_text()
+
+
+# --- the hosted demo must say what it is --------------------------------------
+
+
+def test_demo_mode_is_off_unless_asked_for(tmp_path: Path) -> None:
+    """A self-hosted install must never show a demonstration warning."""
+    from fastapi.testclient import TestClient
+
+    from caguard.api.app import create_app
+
+    client = TestClient(create_app(tmp_path / "review.db"))
+    assert client.get("/api/health").json()["demo_mode"] is False
+
+
+def test_demo_mode_is_reported_when_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """D-005: the hosted demo is not the private product and must say so.
+
+    A CA who uploaded a real ledger to a public demo because the interface did
+    not say otherwise would have been misled by us.
+    """
+    from fastapi.testclient import TestClient
+
+    from caguard.api.app import create_app
+
+    monkeypatch.setenv("CAGUARD_DEMO", "1")
+    client = TestClient(create_app(tmp_path / "review.db"))
+    assert client.get("/api/health").json()["demo_mode"] is True
+
+
+def test_the_railway_config_health_checks_a_public_endpoint() -> None:
+    """The health check must not need credentials, or the deploy never goes live."""
+    import json
+
+    config = json.loads((ROOT / "railway.json").read_text())
+    assert config["deploy"]["healthcheckPath"] == "/api/health"
+    assert config["build"]["builder"] == "DOCKERFILE"

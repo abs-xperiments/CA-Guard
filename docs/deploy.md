@@ -99,6 +99,43 @@ curl -s http://127.0.0.1:3000/api/health
 
 ---
 
+## Public demo on Railway
+
+**Prepared, not deployed.** Everything below is ready; the steps are yours to run because they involve an account and a monthly charge.
+
+### What is already in place
+
+| | |
+|---|---|
+| `railway.json` | Builds the Dockerfile, health-checks `/api/health` |
+| Port | Next reads Railway's `$PORT` itself — no `$PORT` in a start command, which Railway would not expand |
+| The analysis API | Stays on loopback **inside** the container. Only the workspace is ever reachable. |
+| Authentication | Every ledger route requires a signed-in account |
+| **Bootstrap protection** | With `CAGUARD_INVITE_CODE` set, even the *first* account needs it — closing the window between going live and you signing up |
+| **Demo banner** | With `CAGUARD_DEMO=1`, every page says it is a demonstration on synthetic data |
+
+### The settings you must add
+
+| Variable | Value | Why it matters |
+|---|---|---|
+| `CAGUARD_DEMO` | `1` | Shows the banner. **Required.** Without it the page implies a privacy claim that is not true of hosted infrastructure (D-005). |
+| `CAGUARD_INVITE_CODE` | a long random string | Stops strangers creating accounts, including the first one. **Required.** |
+| `CAGUARD_STORE` | `/data/review.db` | Already the default; set it if you mount the volume elsewhere. |
+
+### A volume is not optional
+
+Railway containers have ephemeral disks. **Without a volume mounted at `/data`, every review decision is lost on each redeploy** — and the decisions are the only thing in the system that cannot be recomputed.
+
+### Cost
+
+**Hobby, $5/month.** The free plan gives 1 vCPU and 0.5 GB of RAM; this stack will not run in that.
+
+### After it is live
+
+1. **Sign up immediately**, using the invite code, so the administrator account is yours.
+2. Generate a demonstration ledger locally with `caguard generate` and upload that.
+3. **Never upload a real client ledger.** The banner says so; it is on you as well.
+
 ## Public demo — a decision, not a default
 
 **Nothing is deployed and nothing has been spent.** Founder direction C-1 was explicit: keep development at ₹0 and revisit hosting only once the product works. It now works, so the decision is live.

@@ -52,3 +52,5 @@
 | D-048 | Decisions are optimistic with an undo, not confirmation dialogs. | Decided | Undo is honest here: the trail is append-only, so undoing records a further decision rather than erasing one. ADR-0008. |
 | D-049 | Signup is open for the first account and invite-only after that. | Decided | A public URL with open signup is strangers uploading files and running up the bill. |
 | D-050 | Passwords are scrypt-hashed with a stdlib implementation; no new dependency. | Decided | Memory-hard and adequate for a self-hosted audit tool; Argon2 would add a compiled package. |
+| D-051 | Where an invite code is configured, it is required for the first account too. | Decided | A public deployment otherwise has a race between going live and the owner signing up, in which a stranger becomes administrator. |
+| D-052 | A hosted deployment shows a permanent banner saying it is a demonstration on synthetic data. | Decided | D-005: the hosted demo is not the private product, and a CA must not be misled about where their client's ledger sits. |

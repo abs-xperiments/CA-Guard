@@ -58,6 +58,11 @@ class SignupPolicy:
             )
         return "An invite code from your firm is needed to create an account."
 
+    @property
+    def protects_first_account(self) -> bool:
+        """Whether even the first account needs the code — true on a deployment."""
+        return not self.is_open
+
 
 def signup_policy(data_dir: Path, *, has_users: bool) -> SignupPolicy:
     """Work out the signup rule for this installation.
@@ -66,10 +71,17 @@ def signup_policy(data_dir: Path, *, has_users: bool) -> SignupPolicy:
     deployment would supply it — and is otherwise generated once and written
     beside the database, so a self-hosted firm gets a code without inventing one.
     """
+    configured = os.environ.get(INVITE_ENV, "").strip()
+
     if not has_users:
+        # A public deployment has a race: between the moment it goes live and
+        # the moment the owner signs up, the first-account rule would let a
+        # stranger become the administrator. Where an invite code is configured,
+        # it is required for the first account too, which closes that window.
+        if configured:
+            return SignupPolicy(SignupState.INVITE_ONLY, configured)
         return SignupPolicy(SignupState.BOOTSTRAP, None)
 
-    configured = os.environ.get(INVITE_ENV, "").strip()
     if configured:
         return SignupPolicy(SignupState.INVITE_ONLY, configured)
 

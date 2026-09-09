@@ -349,3 +349,30 @@ def test_the_reviewer_comes_from_the_session_not_the_request(
 
     trail = signed_in.get(f"/api/engagements/{engagement}/trail").json()
     assert trail[0]["reviewer"] == "Abirami"
+
+
+def test_a_configured_invite_code_protects_even_the_first_account(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Closes a race a public deployment would otherwise have.
+
+    Between a deployment going live and its owner signing up, the
+    first-account-is-free rule would let a passer-by become the administrator.
+    Where an invite code is configured, it is required from the very first
+    account, so that window does not exist.
+    """
+    monkeypatch.setenv("CAGUARD_INVITE_CODE", "firm-code-2026")
+    policy = signup_policy(tmp_path, has_users=False)
+
+    assert policy.state is SignupState.INVITE_ONLY
+    assert policy.protects_first_account
+    with pytest.raises(AuthError, match="invite code"):
+        policy.check(None)
+    policy.check("firm-code-2026")
+
+
+def test_a_local_install_still_bootstraps_freely(tmp_path: Path) -> None:
+    """No code configured means a firm can just install it and start."""
+    policy = signup_policy(tmp_path, has_users=False)
+    assert policy.is_open
+    policy.check(None)
