@@ -15,7 +15,7 @@
 import { useEffect, useRef } from "react";
 import type { Finding } from "@/lib/types";
 import { concernLabel, ukDate } from "@/lib/types";
-import { BandBadge, EvidenceMeter, StatusLabel, cx } from "./ui";
+import { BandBadge, StatusLabel, cx } from "./ui";
 
 interface Props {
   findings: Finding[];
@@ -25,6 +25,8 @@ interface Props {
   settling: Set<string>;
   onSelect: (voucherId: string) => void;
   onCursorChange: (index: number) => void;
+  /** Columns the uploaded file did not have: their evidence cannot be counted. */
+  notInFile?: string[];
 }
 
 export function FindingsTable({
@@ -34,6 +36,7 @@ export function FindingsTable({
   settling,
   onSelect,
   onCursorChange,
+  notInFile = [],
 }: Props) {
   const rowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
 
@@ -43,17 +46,25 @@ export function FindingsTable({
   }, [cursor]);
 
   return (
-    <div className="overflow-hidden rounded-lg border border-line bg-surface">
-      <table className="w-full border-collapse text-sm">
+    // A container query, not a viewport one: what matters is how wide the queue
+    // itself is, which shrinks when a finding is open beside it.
+    <div className="@container overflow-hidden rounded-lg border border-line bg-surface">
+      {/* Fixed layout: the table always fits its container, and long content
+          truncates instead of pushing the page sideways. */}
+      <table className="w-full table-fixed border-collapse text-sm">
         <thead className="sticky top-0 z-10">
           <tr className="border-b border-line bg-canvas/95 backdrop-blur-sm">
-            <Th className="w-[13%]">Voucher</Th>
-            <Th className="w-[10%]">Date</Th>
-            <Th className="w-[13%] text-right">Amount</Th>
-            <Th className="w-[9%]">Risk</Th>
+            <Th className="w-[36%] @4xl:w-[24%]">Voucher</Th>
+            <Th className="hidden w-[9%] @4xl:table-cell">Date</Th>
+            <Th className="w-[24%] text-right @4xl:w-[12%]">Amount</Th>
+            <Th className="w-[13%] @4xl:w-[7%]">Risk</Th>
             <Th>Why it was flagged</Th>
-            <Th className="w-[12%]">Evidence</Th>
-            <Th className="w-[11%]">Status</Th>
+            <Th className="hidden w-[10%] @4xl:table-cell">
+              <span title="Expected evidence present: document, approval where the amount needs one, narration">
+                Evidence
+              </span>
+            </Th>
+            <Th className="hidden w-[10%] @4xl:table-cell">Status</Th>
           </tr>
         </thead>
         <tbody>
@@ -90,9 +101,26 @@ export function FindingsTable({
                   <span className="font-mono text-[13px] text-ink">
                     {finding.voucher_id}
                   </span>
+                  {/* What the transaction is, so a row can be judged before opening it. */}
+                  {finding.accounts.length || finding.narration ? (
+                    <span
+                      className="block truncate text-[11px] text-ink-muted"
+                      title={[finding.accounts.join(" · "), finding.narration]
+                        .filter(Boolean)
+                        .join(" — ")}
+                    >
+                      {finding.accounts.slice(0, 2).join(" · ")}
+                      {finding.accounts.length > 2 ? " …" : ""}
+                      {finding.narration ? (
+                        <span className="text-ink-faint"> — {finding.narration}</span>
+                      ) : null}
+                    </span>
+                  ) : null}
                 </Td>
-                <Td className="text-ink-muted">{ukDate(finding.voucher_date)}</Td>
-                <Td className="tabular text-right font-medium">
+                <Td className="hidden text-ink-muted @4xl:table-cell">
+                  {ukDate(finding.voucher_date)}
+                </Td>
+                <Td className="tabular truncate text-right font-medium">
                   {finding.amount_display}
                 </Td>
                 <Td>
@@ -115,10 +143,10 @@ export function FindingsTable({
                     ) : null}
                   </div>
                 </Td>
-                <Td>
-                  <EvidenceMeter completeness={finding.evidence.completeness} />
+                <Td className="hidden @4xl:table-cell">
+                  <EvidenceCount finding={finding} notInFile={notInFile} />
                 </Td>
-                <Td>
+                <Td className="hidden @4xl:table-cell">
                   <StatusLabel status={finding.status} />
                 </Td>
               </tr>
@@ -146,4 +174,30 @@ function Th({ children, className }: { children: React.ReactNode; className?: st
 
 function Td({ children, className }: { children: React.ReactNode; className?: string }) {
   return <td className={cx("px-3 py-2.5 align-middle", className)}>{children}</td>;
+}
+
+/**
+ * "1 of 3", counted exactly as the explanation card counts: an approval below
+ * the limit is not expected, and a column the file never had is not counted —
+ * that is a fact about the export, not about the client.
+ */
+function EvidenceCount({ finding, notInFile }: { finding: Finding; notInFile: string[] }) {
+  const checks: boolean[] = [];
+  const evidence = finding.evidence;
+  if (!notInFile.includes("document_ref")) checks.push(evidence.has_document);
+  if (evidence.approval_expected && !notInFile.includes("approved_by")) {
+    checks.push(evidence.has_approval);
+  }
+  if (!notInFile.includes("narration")) checks.push(evidence.has_narration);
+  if (!checks.length) {
+    return <span className="text-[12px] text-ink-faint">not in file</span>;
+  }
+  const present = checks.filter(Boolean).length;
+  const tone =
+    present === checks.length ? "text-rejected" : present === 0 ? "text-high" : "text-medium";
+  return (
+    <span className={cx("tabular text-[12px] font-medium", tone)}>
+      {present} of {checks.length}
+    </span>
+  );
 }

@@ -179,3 +179,13 @@ def test_coercion_is_safe_on_already_typed_data(ledger) -> None:
     twice = to_canonical_types(once)
     assert once.debit_paise.equals(twice.debit_paise)
     assert once.is_manual.equals(twice.is_manual)
+
+
+def test_common_document_and_posting_headings_are_recognised() -> None:
+    """Found while preparing the sample ledger: both were silently unmapped, so every
+    entry looked undocumented and posting times were lost."""
+    mapping = infer_mapping(
+        ["Voucher No", "Date", "Ledger", "Debit", "Credit", "Doc Ref", "Posted"]
+    )
+    assert mapping.resolved["Doc Ref"] == "document_ref"
+    assert mapping.resolved["Posted"] == "posted_at"

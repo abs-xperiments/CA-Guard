@@ -217,13 +217,14 @@ export function ComparablesSection({
       ) : null}
       {similar.length ? (
         <div className="mt-2 overflow-hidden rounded-md border border-line">
-          <table className="w-full text-[12px]">
+          {/* Fixed layout so a long narration truncates instead of widening the drawer. */}
+          <table className="w-full table-fixed text-[12px]">
             <thead className="bg-canvas text-ink-faint">
               <tr>
-                <th className="px-3 py-1.5 text-left font-medium">Similar entry</th>
-                <th className="px-3 py-1.5 text-right font-medium">Amount</th>
-                <th className="px-3 py-1.5 text-left font-medium">Document</th>
-                <th className="px-3 py-1.5 text-left font-medium">By</th>
+                <th className="w-[48%] px-3 py-1.5 text-left font-medium">Similar entry</th>
+                <th className="w-[22%] px-3 py-1.5 text-right font-medium">Amount</th>
+                <th className="w-[14%] px-3 py-1.5 text-left font-medium">Document</th>
+                <th className="w-[16%] px-3 py-1.5 text-left font-medium">By</th>
               </tr>
             </thead>
             <tbody>
@@ -252,7 +253,7 @@ function ComparableRow({
   return (
     <tr className="border-t border-line align-top">
       <td className="px-3 py-1.5">
-        <div className="flex items-center gap-1.5">
+        <div className="flex min-w-0 flex-wrap items-center gap-x-1.5">
           {openable ? (
             <button
               type="button"
@@ -278,11 +279,13 @@ function ComparableRow({
           </p>
         ) : null}
       </td>
-      <td className="tabular px-3 py-1.5 text-right text-ink">{entry.amount_display}</td>
+      <td className="tabular truncate px-3 py-1.5 text-right text-ink">
+        {entry.amount_display}
+      </td>
       <td className={cx("px-3 py-1.5", entry.has_document ? "text-rejected" : "text-high")}>
         {entry.has_document ? "Yes" : "No"}
       </td>
-      <td className="px-3 py-1.5 text-ink-muted">{entry.created_by ?? "—"}</td>
+      <td className="truncate px-3 py-1.5 text-ink-muted">{entry.created_by ?? "—"}</td>
     </tr>
   );
 }
@@ -327,13 +330,13 @@ export function Transaction({ lines }: { lines: LedgerLine[] }) {
   const first = lines[0];
   return (
     <div className="overflow-hidden rounded-md border border-line">
-      <table className="w-full text-[12px]">
+      <table className="w-full table-fixed text-[12px]">
         <thead className="bg-canvas text-ink-faint">
           <tr>
-            <th className="px-3 py-1.5 text-left font-medium">Account</th>
-            <th className="px-3 py-1.5 text-right font-medium">Debit</th>
-            <th className="px-3 py-1.5 text-right font-medium">Credit</th>
-            <th className="px-3 py-1.5 text-right font-medium" title="Row in the uploaded file">
+            <th className="w-[44%] px-3 py-1.5 text-left font-medium">Account</th>
+            <th className="w-[22%] px-3 py-1.5 text-right font-medium">Debit</th>
+            <th className="w-[22%] px-3 py-1.5 text-right font-medium">Credit</th>
+            <th className="w-[12%] px-3 py-1.5 text-right font-medium" title="Row in the uploaded file">
               Row
             </th>
           </tr>
@@ -341,14 +344,18 @@ export function Transaction({ lines }: { lines: LedgerLine[] }) {
         <tbody>
           {lines.map((line) => (
             <tr key={line.line_id} className="border-t border-line">
-              <td className="px-3 py-1.5">
+              <td className="truncate px-3 py-1.5" title={`${line.account_name} ${line.account_code}`}>
                 <span className="text-ink">{line.account_name || "—"}</span>
                 <span className="ml-1.5 font-mono text-[11px] text-ink-faint">
                   {line.account_code}
                 </span>
               </td>
-              <td className="tabular px-3 py-1.5 text-right text-ink">{line.debit_display}</td>
-              <td className="tabular px-3 py-1.5 text-right text-ink">{line.credit_display}</td>
+              <td className="tabular truncate px-3 py-1.5 text-right text-ink">
+                {line.debit_display}
+              </td>
+              <td className="tabular truncate px-3 py-1.5 text-right text-ink">
+                {line.credit_display}
+              </td>
               <td className="tabular px-3 py-1.5 text-right text-ink-faint">
                 {line.source_row?.toLocaleString("en-IN") ?? "—"}
               </td>

@@ -241,7 +241,10 @@ export function Modal({
             ✕
           </button>
         </header>
-        <div className="flex-1 overflow-auto">{children}</div>
+        {/* Focusable, so a wide file preview can be scrolled from the keyboard. */}
+        <div className="flex-1 overflow-auto" tabIndex={0}>
+          {children}
+        </div>
         {footer ? <footer className="border-t border-line px-5 py-3">{footer}</footer> : null}
       </div>
     </div>

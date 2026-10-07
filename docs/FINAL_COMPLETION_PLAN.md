@@ -355,7 +355,26 @@ Also covered:
 - restart mid-review;
 - three persona walkthroughs (experienced CA, junior auditor, non-technical accountant), written up with fixes applied.
 
-### Phase 8 — UX polish
+### Phase 8 — UX polish — ✅ done 2026-10-08 01:40 IST
+
+**How the criteria were met:**
+- **All six walk-through findings addressed:**
+  - first-run redirect to account creation;
+  - what a usable export contains, plus a synthetic sample ledger;
+  - each queue row says what the transaction is;
+  - evidence as "x of y", counted exactly as the card counts;
+  - a one-time "where to start" hint;
+  - plain wording for the amount measure.
+- **Accessibility:** axe-core WCAG 2.2 AA shows 0 violations on every screen, after fixing contrast tokens, a missing link name, a missing `main` landmark, keyboard-scrollable regions and heading order.
+- **Widths:** measured at 1440, 1024 and 768 px with no horizontal overflow (container queries; full-screen drawer under 1024 px; fixed-layout tables). Details in `docs/09_UI_UX.md`.
+- **Found while preparing the sample:** the headings "Doc Ref" and "Posted" were not recognised, so such exports looked wholly undocumented and lost posting times. Fixed and pinned by a test.
+- **An architectural guard** (ADR-0003) stopped the API importing the generator. The sample is therefore a committed file, proven reproducible by a test.
+
+**Detector backlog (not changed; ADR-0004 freezes thresholds):**
+- Tally exports carry no "manual entry" flag, so the manual-entry-without-document rule cannot fire on them.
+- Opening-balance vouchers are compared with ordinary entries for the amount signal (noted in Phase 3).
+
+Both need a benchmark re-run before any change.
 **Acceptance:**
 - consistent terminology and spacing;
 - empty, loading and error states on every screen;

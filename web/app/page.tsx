@@ -51,6 +51,14 @@ export default function Home() {
     void load();
   }, [load]);
 
+  async function trySample() {
+    try {
+      await open(await api.sampleLedger());
+    } catch (caught) {
+      setUploadError(caught instanceof ApiError ? caught.message : "The sample could not be opened.");
+    }
+  }
+
   async function open(file: File) {
     setUploading(true);
     setUploadError(null);
@@ -147,6 +155,11 @@ export default function Home() {
               CSV or Excel (.xlsx, .xls). The file stays on the computer running CA-Guard, kept
               exactly as uploaded so you can download it again.
             </p>
+            <p className="mx-auto mt-2 max-w-lg text-[12px] text-ink-faint">
+              One row per ledger line, with a voucher number, a date, an account and a debit
+              and credit (or a signed amount). Tally exports with their usual headings work;
+              CA-Guard shows how it read every column.
+            </p>
             {uploadError ? (
               <div
                 role="alert"
@@ -166,6 +179,13 @@ export default function Home() {
                 {uploadError ? "Choose another file" : "Choose a file"}
               </Button>
             </div>
+            <button
+              type="button"
+              onClick={() => void trySample()}
+              className="mt-3 text-[12px] font-medium text-accent hover:underline"
+            >
+              No ledger to hand? Try it with a sample ledger (synthetic data)
+            </button>
           </>
         )}
         <input

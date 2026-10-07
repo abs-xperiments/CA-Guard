@@ -67,6 +67,12 @@ ALIASES: dict[str, frozenset[str]] = {
             "created on",
             "entry time",
             "posting timestamp",
+            "posted",
+            "posted on",
+            "entered on",
+            "entered at",
+            "created at",
+            "entry timestamp",
         }
     ),
     "voucher_type": frozenset(
@@ -136,6 +142,11 @@ ALIASES: dict[str, frozenset[str]] = {
             "bill no",
             "invoice no",
             "voucher ref",
+            "doc ref",
+            "doc ref no",
+            "document reference",
+            "supporting doc",
+            "doc reference",
         }
     ),
     "narration": frozenset(

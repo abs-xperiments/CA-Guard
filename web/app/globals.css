@@ -9,8 +9,11 @@
 */
 @theme {
   --color-ink: #0f172a;
-  --color-ink-muted: #64748b;
-  --color-ink-faint: #94a3b8;
+  /* Both meet WCAG AA (4.5:1) for small text on --surface and --canvas: the
+     faint hints include the privacy statement and the password rule, which
+     people need to read. Faint stays lighter than muted, so hierarchy holds. */
+  --color-ink-muted: #475569;
+  --color-ink-faint: #627084;
   --color-surface: #ffffff;
   --color-canvas: #f8fafc;
   --color-line: #e2e8f0;

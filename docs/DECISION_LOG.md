@@ -69,3 +69,5 @@
 | D-065 | The workspace accepts CSV, XLSX and XLS uploads; Parquet is read from the command line only. | Decided | No CA tool exports Parquet, and its declared sizes cannot bound decoded memory (measured 21 KB declared, 200 MB decoded). |
 | D-066 | Signing out ends every session for that account (session epoch); so does a password change. | Decided | A stateless cookie that survives sign-out is a stolen cookie that survives sign-out. "Sign out everywhere" is the simplest correct behaviour for a small team. |
 | D-067 | A configured invite code must be at least 16 characters, or the app will not start. | Decided | On the public demo it is the only barrier to an account, and it is tried online. |
+| D-068 | The sample ledger is a committed, generated file (Tally-style, seed 20251001), never generated at runtime. | Decided | ADR-0003 forbids the product importing the generator; a test proves the file is exactly what the script produces. |
+| D-069 | Small-print text meets WCAG AA contrast via the design tokens rather than per-element fixes. | Decided | The faint hints include the privacy statement and the password rule; one token change fixes every use. |

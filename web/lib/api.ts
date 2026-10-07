@@ -135,6 +135,15 @@ export const api = {
 
   job: (id: string) => request<UploadJob>(`/api/jobs/${encodeURIComponent(id)}`),
 
+  /** A synthetic ledger to try CA-Guard with, as a File ready to upload. */
+  sampleLedger: async (): Promise<File> => {
+    const response = await fetch("/api/sample-ledger", { cache: "no-store" });
+    if (!response.ok) throw new ApiError("The sample ledger could not be prepared.", response.status);
+    return new File([await response.blob()], "CA-Guard sample ledger (synthetic).csv", {
+      type: "text/csv",
+    });
+  },
+
   queue: (id: string) => request<Queue>(`/api/engagements/${encodeURIComponent(id)}/queue`),
 
   finding: (id: string, voucher: string) =>

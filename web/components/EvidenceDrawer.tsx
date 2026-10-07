@@ -183,12 +183,14 @@ export function EvidenceDrawer({
       ref={panel}
       tabIndex={-1}
       aria-label={`Finding ${finding.voucher_id}`}
-      className="animate-drawer flex h-full w-[42rem] max-w-[46vw] flex-col border-l border-line bg-surface"
+      // Beside the queue on a laptop; over it on a tablet, where splitting the
+      // width would leave neither pane usable.
+      className="animate-drawer fixed inset-0 z-30 flex flex-col bg-surface lg:static lg:z-auto lg:h-full lg:w-[42rem] lg:max-w-[46vw] lg:border-l lg:border-line"
     >
       <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="font-mono text-sm text-ink">{finding.voucher_id}</span>
+            <h2 className="font-mono text-sm text-ink">{finding.voucher_id}</h2>
             <BandBadge band={finding.band} />
             <span className="tabular text-xs text-ink-faint">
               priority {finding.priority.toFixed(2)}

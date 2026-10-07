@@ -903,3 +903,42 @@ Before changing anything, I re-read the whole project. Then I actually *used* it
 
 **Next step:** Phase 8, polish. The six walk-through improvements first, then a pass over spacing, wording, empty and error states, tablet width and accessibility.
 
+---
+
+## 2026-10-08 01:40 IST — [PHASE 8 of completion] Polish: the first five minutes, readability for juniors, accessibility, tablets.
+
+**What happened:**
+- **The first five minutes are smoother:**
+  - a brand-new install opens straight on "Create your account" instead of asking for a password nobody has;
+  - the upload area says what a usable file contains;
+  - a new **"Try it with a sample ledger"** button opens a realistic synthetic Tally-style ledger in one click. That matters for the public demo: a faculty reviewer can see everything without having, or being tempted to use, a real client's file.
+- **The queue is easier for a junior to read:**
+  - each row now shows what the transaction is ("Miscellaneous Expenses · Provision for Expenses — Year-end adjustment"), not just a voucher number;
+  - evidence reads "1 of 3", matching the explanation;
+  - a one-line "start at the top" hint appears until the first decision;
+  - "6.7 robust deviations" is now "6.7× the account's typical spread".
+- **Accessibility:** an automated check against the WCAG 2.2 AA standard now finds **no problems on any screen**. The main fix was making small grey text darker; the privacy statement and password rule were too faint to read comfortably.
+- **Tablets and small laptops:** on narrower screens the queue drops the columns you can live without, and on a tablet an opened finding fills the screen. I measured three screen sizes and nothing spills sideways.
+
+**A real bug found while making the sample:** files with the column headings **"Doc Ref"** or **"Posted"** weren't recognised. A ledger exported that way looked as if *no entry had any supporting document*, and posting times were lost. Fixed, with a test.
+
+**A safeguard that worked:** an automatic architecture check stopped me building the sample ledger the wrong way, in a way that could have weakened our research claims. The sample is now a fixed file, with a test proving it is exactly what our generator produces.
+
+**Two things for the research track, not changed now:**
+1. Tally exports don't mark which entries were manual, so one of our ten checks can't fire on them.
+2. Opening balances get compared with day-to-day entries.
+
+Both need a benchmark re-run before any change.
+
+**Tests/checks:**
+- ruff ✅ · pyright 0 ✅ · **678 tests** ✅ · **4 browser tests** ✅ (including the new sample-ledger and first-run paths)
+- smoke ✅ · accessibility scan 0 violations ✅
+
+---
+
+### 🟡 [CREDENTIALS NEEDED] Phase 9 is deployment, and it needs you
+
+Everything that can be done without your accounts is done. Deploying to Railway (your decision, D-053) needs a few things only you can do: create or sign in to the Railway account, approve the $5/month Hobby plan, and log the Railway CLI in on this Mac. Step-by-step instructions are in my message to you.
+
+**Next step:** Phase 9, once you've done the Railway steps; then Phase 10, testing the live site end to end.
+

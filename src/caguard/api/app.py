@@ -14,12 +14,15 @@ original after a restart — see `caguard.api.workspace`.
 
 from __future__ import annotations
 
+import gzip
 import io
 import logging
 import os
 import secrets
 import sqlite3
 import tempfile
+from functools import lru_cache
+from importlib import resources
 from pathlib import Path
 
 import pandas as pd
@@ -66,6 +69,8 @@ from caguard.review.store import ReviewStore
 #: Uploads are copied to disk in chunks of this size, so a large ledger is never
 #: held in memory twice and an oversized one is refused part-way through.
 UPLOAD_CHUNK_BYTES = 1024 * 1024
+
+SAMPLE_FILENAME = "CA-Guard sample ledger (synthetic).csv"
 
 logger = logging.getLogger("caguard.api")
 
@@ -154,6 +159,19 @@ def create_app(
         if analysis is not None:
             analysis.engagement = renamed
         return EngagementOut.build(renamed)
+
+    @app.get("/api/sample-ledger")
+    def sample_ledger(user: User = signed_in) -> PlainTextResponse:
+        """A synthetic ledger to try CA-Guard with — no client data involved.
+
+        For a first look, and for the public demo, where a visitor should never
+        need (or be tempted to use) a real client's file.
+        """
+        return PlainTextResponse(
+            _sample_ledger_csv(),
+            media_type="text/csv",
+            headers={"Content-Disposition": f'attachment; filename="{SAMPLE_FILENAME}"'},
+        )
 
     @app.post("/api/uploads", response_model=JobOut, status_code=202)
     async def start_upload(file: UploadFile, user: User = signed_in) -> JobOut:
@@ -349,6 +367,17 @@ def create_app(
 
 def _text_or_none(value: object) -> str | None:
     return value.strip() or None if isinstance(value, str) else None
+
+
+@lru_cache(maxsize=1)
+def _sample_ledger_csv() -> str:
+    """The committed synthetic sample (``scripts/make_sample_ledger.py``).
+
+    Read from a file rather than generated: the API must never import the
+    benchmark generator (ADR-0003).
+    """
+    packed = resources.files("caguard.api").joinpath("assets/sample_ledger.csv.gz").read_bytes()
+    return gzip.decompress(packed).decode()
 
 
 def _sweep_leftover_uploads(data_dir: Path) -> None:

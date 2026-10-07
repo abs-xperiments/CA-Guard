@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
@@ -14,6 +14,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  // A brand-new installation has no account to sign in to. Asking for a
+  // password nobody has, with the way forward in small print, stalls exactly
+  // the person least likely to work it out — so go straight to setting up.
+  useEffect(() => {
+    auth
+      .signupState()
+      .then((state) => {
+        if (!state.any_users) router.replace("/signup");
+      })
+      .catch(() => undefined);
+  }, [router]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();

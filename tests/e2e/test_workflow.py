@@ -47,6 +47,10 @@ def test_the_whole_review_journey(page: Page, stack: Stack, ledger_file: Path) -
     errors: list[str] = []
     page.on("console", lambda m: errors.append(m.text) if m.type == "error" else None)
 
+    # A brand-new installation goes straight to setting up, not to "Sign in".
+    page.goto(f"{stack.web}/login")
+    page.wait_for_url(re.compile(r"/signup"), timeout=TIMEOUT)
+
     _sign_up(page, stack, "partner@firm.in", "R. Iyer")
     _upload(page, ledger_file)
 
@@ -71,7 +75,7 @@ def test_the_whole_review_journey(page: Page, stack: Stack, ledger_file: Path) -
     expect(dialog.locator("tr.bg-accent-soft").first).to_be_visible()
 
     # A decision key pressed while the file is open must do nothing.
-    voucher = drawer.locator("span.font-mono").first.inner_text()
+    voucher = drawer.get_by_role("heading", level=2).first.inner_text()
     page.keyboard.press("e")
     page.keyboard.press("Escape")
     expect(dialog).to_be_hidden()
@@ -90,8 +94,8 @@ def test_the_whole_review_journey(page: Page, stack: Stack, ledger_file: Path) -
 
     # The drawer holds the decided finding for a beat (the button shows a tick),
     # then moves on — wait for that, as a person reading it would.
-    expect(drawer.locator("span.font-mono").first).not_to_have_text(voucher, timeout=TIMEOUT)
-    second = drawer.locator("span.font-mono").first.inner_text()
+    expect(drawer.get_by_role("heading", level=2).first).not_to_have_text(voucher, timeout=TIMEOUT)
+    second = drawer.get_by_role("heading", level=2).first.inner_text()
 
     # Clearing needs a reason.
     note = page.get_by_placeholder(re.compile("Required when clearing"))
@@ -128,7 +132,9 @@ def test_the_whole_review_journey(page: Page, stack: Stack, ledger_file: Path) -
 
     # A deep link opens the finding after a reload.
     page.goto(f"{page.url.split('?')[0]}?finding={voucher}")
-    expect(page.get_by_role("complementary").locator("span.font-mono").first).to_have_text(voucher)
+    expect(page.get_by_role("complementary").get_by_role("heading", level=2).first).to_have_text(
+        voucher
+    )
 
     # Search narrows the queue; a nonsense search says so plainly.
     page.keyboard.press("Escape")
@@ -163,3 +169,11 @@ def test_signing_out_ends_the_session(page: Page, stack: Stack) -> None:
     page.goto(stack.web)
     page.wait_for_url(re.compile(r"/login"), timeout=TIMEOUT)
     assert page.request.get(f"{stack.web}/api/engagements").status == 401
+
+
+def test_a_reviewer_without_a_ledger_can_try_the_sample(page: Page, stack: Stack) -> None:
+    _sign_up(page, stack, "faculty@college.edu", "Faculty Reviewer")
+    page.get_by_role("button", name=re.compile("Try it with a sample ledger")).click()
+    page.wait_for_url(re.compile(r"/review/[0-9a-f]{16}"), timeout=TIMEOUT)
+    expect(page.locator("tbody tr").first).to_be_visible(timeout=TIMEOUT)
+    expect(page.get_by_text("Start at the top")).to_be_visible()

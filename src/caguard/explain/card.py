@@ -196,13 +196,18 @@ def _working(hit: SignalHit, names: Mapping[str, str]) -> list[tuple[str, str]]:
                 ),
                 ("Entries compared", f"{int(e['entries_compared']):,}"),
             ]
-        rows.append(
+        rows += [
             (
-                "Distance from usual",
-                f"{e.get('robust_deviations')} robust deviations (flagged at "
-                f"{e.get('threshold')} or more)",
-            )
-        )
+                "How far from usual",
+                f"{e.get('robust_deviations')}× the account's typical spread "
+                f"(flagged at {e.get('threshold')}× or more)",
+            ),
+            (
+                "Measured how",
+                "Against the account's median on a logarithmic scale, so a few very "
+                "large entries cannot distort what counts as usual",
+            ),
+        ]
         return rows
 
     if kind is SignalKind.MISSING_EVIDENCE:
