@@ -658,3 +658,34 @@ Before changing anything, I re-read the whole project. Then I actually *used* it
 - **Buttons:** "Exception — follow up", "Cleared — not a concern", "Investigate". Decisions already saved keep their meaning, because only the labels change.
 
 **Next step:** Phase 1, the critical fixes.
+
+---
+
+## 2026-10-07 21:55 IST — [PHASE 1 of completion] The critical fixes. Every one was checked through the real screen, not just the engine.
+
+**What happened:** the seven problems from the audit that would have hit a CA first are fixed.
+1. **Large ledgers upload.** A 27 MB, 116,000-row ledger now goes through the actual workspace in about 15 seconds. Before, anything over 10 MB failed after 30 seconds.
+2. **The app no longer freezes while it analyses.** The heavy work now runs in the background of the server, so other people's clicks are answered straight away.
+3. **Two uploads at the same moment can't get mixed up.** Before, they shared one temporary file name. Each now gets its own, and it is always cleaned up afterwards.
+4. **Windows Excel CSVs and old `.xls` files now open.** If a file wasn't standard UTF-8, the intake notice says so, so you can check that names look right.
+5. **Error messages are written for people.** They name *your* file, say what went wrong and what to do, and say "Nothing was saved". An unexpected failure gives an error reference instead of computer text.
+6. **Security.**
+   - The web framework is patched (0 known vulnerabilities, Python and web).
+   - After 5 wrong passwords an account waits 15 minutes. This is per account, so one person's typos can't lock out the firm.
+   - On an HTTPS deployment the login cookie is now marked "HTTPS only".
+   - The public health check no longer reveals how many ledgers are open.
+
+**Why it matters:** these were the difference between "works in a demo" and "works at 11:30 pm on the client's real ledger".
+
+**New safety net:** `make smoke` starts the real workspace and engine together and uploads a 27 MB ledger through the screen. The 10 MB bug went unnoticed because all our tests talked to the engine directly. This one doesn't.
+
+**Tests/checks:**
+- ruff ✅ · pyright 0 errors ✅ · **561 tests** ✅ (27 new, including one proving a failure log never contains ledger text) · TypeScript ✅ · web build ✅
+- both dependency audits clean ✅
+- smoke test through the workspace: 5/5 ✅
+
+**One honest limitation:** for very large files, the size limit kicks in after the web server has received the whole file, not while it is still arriving. Nothing is held in memory twice, and the 200 MB cap still holds. A hosting-level limit is the cleaner fix, and I'll set one at deployment.
+
+**Founder decision needed:** none.
+
+**Next step:** Phase 2. CA-Guard keeps your uploaded files, so you can download the exact original, every finding points at its row in your file, and nothing has to be re-uploaded after a restart.

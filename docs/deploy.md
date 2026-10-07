@@ -120,6 +120,7 @@ curl -s http://127.0.0.1:3000/api/health
 |---|---|---|
 | `CAGUARD_DEMO` | `1` | Shows the banner. **Required.** Without it the page implies a privacy claim that is not true of hosted infrastructure (D-005). |
 | `CAGUARD_INVITE_CODE` | a long random string | Stops strangers creating accounts, including the first one. **Required.** |
+| `CAGUARD_SECURE_COOKIES` | `1` | Optional. CA-Guard already marks the session cookie Secure when the proxy reports HTTPS; setting this removes any doubt on a hosted deployment. Never set it on a plain-http local install, or sign-in will stop working. |
 | `CAGUARD_STORE` | `/data/review.db` | Already the default; set it if you mount the volume elsewhere. |
 
 ### A volume is not optional

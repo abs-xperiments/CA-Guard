@@ -76,11 +76,18 @@ class NormalisationReport:
     ambiguous: dict[str, list[str]] = field(default_factory=dict)
     rows_in: int = 0
     rows_out: int = 0
+    #: How a CSV was decoded, when the reader recorded it.
+    encoding: str | None = None
 
     @property
     def notes(self) -> list[str]:
         """Caveats worth putting in front of the reviewer before they trust the queue."""
         messages: list[str] = []
+        if self.encoding and self.encoding != "utf-8-sig":
+            messages.append(
+                f"This file was not UTF-8; it was read as {self.encoding.upper()}. "
+                "Check that names and narrations display correctly."
+            )
         if "document_ref" in self.defaulted:
             messages.append(
                 "This file has no supporting-document column, so every entry looks "
@@ -130,6 +137,7 @@ def normalise(frame: pd.DataFrame, *, overrides: dict[str, str] | None = None) -
             mapped={column: column for column in frame.columns},
             rows_in=len(frame),
             rows_out=len(typed),
+            encoding=frame.attrs.get("encoding"),
         )
         return NormalisedLedger(typed, report)
 
@@ -140,6 +148,7 @@ def normalise(frame: pd.DataFrame, *, overrides: dict[str, str] | None = None) -
         ignored=list(mapping.unmapped),
         ambiguous=dict(mapping.ambiguous),
         rows_in=len(frame),
+        encoding=frame.attrs.get("encoding"),
     )
     _check_usable(mapping, report)
 

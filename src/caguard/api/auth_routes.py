@@ -11,6 +11,7 @@ sign with anybody's name. A client is entitled to better than that.
 
 from __future__ import annotations
 
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from caguard.auth import sessions
 from caguard.auth.policy import signup_policy
+from caguard.auth.throttle import LoginThrottle
 from caguard.auth.users import AuthError, User, UserStore
 
 #: Cookies are same-site and http-only, so a script cannot read them and a
@@ -73,8 +75,14 @@ class SignupStateOut(BaseModel):
     any_users: bool
 
 
-def build_auth_router(users: UserStore, data_dir: Path, signing_key: bytes) -> APIRouter:
+def build_auth_router(
+    users: UserStore,
+    data_dir: Path,
+    signing_key: bytes,
+    throttle: LoginThrottle | None = None,
+) -> APIRouter:
     router = APIRouter(prefix="/api/auth", tags=["auth"])
+    throttle = throttle or LoginThrottle()
 
     def policy():
         return signup_policy(data_dir, has_users=not users.is_empty)
@@ -103,11 +111,22 @@ def build_auth_router(users: UserStore, data_dir: Path, signing_key: bytes) -> A
 
     @router.post("/login", response_model=UserOut)
     def login(body: LoginIn, response: Response, request: Request) -> UserOut:
+        wait = throttle.retry_after(body.email)
+        if wait:
+            minutes = max(1, round(wait / 60))
+            raise HTTPException(
+                429,
+                f"Too many failed sign-ins for this account. Try again in about "
+                f"{minutes} minute{'s' if minutes != 1 else ''}.",
+                headers={"Retry-After": str(wait)},
+            )
         try:
             user = users.authenticate(body.email, body.password)
         except AuthError as exc:
+            throttle.failed(body.email)
             # 401, not 422: this is "we do not know you", not "your input is malformed".
             raise HTTPException(401, str(exc)) from exc
+        throttle.succeeded(body.email)
 
         _set_session(response, request, signing_key, user)
         return UserOut.build(user)
@@ -125,14 +144,32 @@ def build_auth_router(users: UserStore, data_dir: Path, signing_key: bytes) -> A
 
 
 def _set_session(response: Response, request: Request, signing_key: bytes, user: User) -> None:
-    secure = request.url.scheme == "https"
     response.set_cookie(
         sessions.COOKIE_NAME,
         sessions.issue(signing_key, user.id, user.email),
         max_age=sessions.SESSION_SECONDS,
-        secure=secure,
+        secure=reached_over_https(request),
         **COOKIE_KWARGS,  # pyright: ignore[reportArgumentType]
     )
+
+
+def reached_over_https(request: Request) -> bool:
+    """Whether the browser is talking to CA-Guard over HTTPS.
+
+    The API never sees the browser directly: the workspace proxies to it over
+    loopback, so ``request.url.scheme`` is always ``http`` — on a hosted HTTPS
+    deployment too, which meant the session cookie was never marked Secure.
+    The proxy's ``X-Forwarded-Proto`` is believed only when the request came
+    from loopback, where nothing but our own proxy can be. A deployment can
+    also force it with ``CAGUARD_SECURE_COOKIES=1``.
+    """
+    if os.environ.get("CAGUARD_SECURE_COOKIES", "").strip().lower() in {"1", "true", "yes"}:
+        return True
+    if request.url.scheme == "https":
+        return True
+    peer = request.client.host if request.client else ""
+    forwarded = request.headers.get("x-forwarded-proto", "").split(",")[0].strip().lower()
+    return peer in {"127.0.0.1", "::1"} and forwarded == "https"
 
 
 def _require_user(users: UserStore, signing_key: bytes):

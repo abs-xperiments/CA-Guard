@@ -15,12 +15,16 @@ there is nothing to persist and nothing that can drift.
 from __future__ import annotations
 
 import io
+import logging
 import os
+import secrets
+import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
 from fastapi import Depends, FastAPI, HTTPException, UploadFile
+from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from caguard.api.auth_routes import build_auth_router, current_user_dependency
@@ -40,7 +44,13 @@ from caguard.detect.types import DetectorConfig
 from caguard.explain.ollama import OllamaProvider
 from caguard.explain.service import ExplanationService
 from caguard.intake.normalise import NormalisationError, NormalisationReport, normalise
-from caguard.intake.readers import SUPPORTED_SUFFIXES, IntakeError, read_table, safe_suffix
+from caguard.intake.readers import (
+    MAX_UPLOAD_BYTES,
+    SUPPORTED_SUFFIXES,
+    IntakeError,
+    read_table,
+    safe_suffix,
+)
 from caguard.review.decisions import Decision, ReviewAction
 from caguard.review.engagement import Engagement, open_engagement
 from caguard.review.finding import Finding, RiskBand
@@ -48,7 +58,11 @@ from caguard.review.fusion import build_findings
 from caguard.review.report import build_rows, to_csv, to_html
 from caguard.review.store import ReviewStore
 
-MAX_UPLOAD_BYTES = 200 * 1024 * 1024
+#: Uploads are copied to disk in chunks of this size, so a large ledger is never
+#: held in memory twice and an oversized one is refused part-way through.
+UPLOAD_CHUNK_BYTES = 1024 * 1024
+
+logger = logging.getLogger("caguard.api")
 
 
 @dataclass
@@ -149,7 +163,6 @@ def create_app(
             "status": "ok",
             "model": workspace.model,
             "model_available": workspace.model_available(),
-            "engagements_loaded": len(workspace.analyses),
             # Set on a hosted deployment so the interface can say plainly that it
             # is a demonstration on synthetic data. The privacy claim belongs to
             # the self-hosted path, and wording that blurs the two would mislead
@@ -164,9 +177,7 @@ def create_app(
     @app.post("/api/engagements", response_model=QueueOut)
     async def upload(file: UploadFile, user: User = signed_in) -> QueueOut:
         """Upload a ledger, analyse it, and return the review queue."""
-        payload = await file.read()
-        if len(payload) > MAX_UPLOAD_BYTES:
-            raise HTTPException(413, f"File is larger than {MAX_UPLOAD_BYTES // 1024 // 1024} MB")
+        display_name = Path(file.filename or "uploaded ledger").name or "uploaded ledger"
 
         # Never build a path from an uploaded filename: only a suffix we
         # recognise is carried across.
@@ -174,37 +185,19 @@ def create_app(
         if not suffix:
             raise HTTPException(
                 400,
-                f"Unsupported file type. CA-Guard reads {', '.join(sorted(SUPPORTED_SUFFIXES))}.",
+                f"{display_name} is not a file type CA-Guard reads. Upload "
+                f"{', '.join(sorted(SUPPORTED_SUFFIXES))}. Nothing was saved.",
             )
-        temp = Path(workspace.store.path).parent / f"_upload{suffix}"
-        temp.write_bytes(payload)
+
+        temp = await _receive(file, Path(workspace.store.path).parent, suffix, display_name)
         try:
-            raw = read_table(temp)
-        except IntakeError as exc:
-            raise HTTPException(400, str(exc)) from exc
+            # Parsing and analysis are CPU-bound and can take seconds on a full
+            # year's ledger. Run on the event loop, they froze the whole server
+            # for every user until they finished (measured: 12 s for a health
+            # check during a 13.5 s analysis).
+            analysis = await run_in_threadpool(_analyse_upload, workspace, temp, display_name)
         finally:
             temp.unlink(missing_ok=True)
-
-        # A real ledger does not arrive in our schema. Map it, derive what can be
-        # derived, and say plainly what the file did not contain.
-        try:
-            normalised = normalise(raw)
-        except NormalisationError as exc:
-            raise HTTPException(400, str(exc)) from exc
-
-        try:
-            analysis = workspace.analyse(
-                normalised.lines,
-                source=file.filename or "uploaded ledger",
-                intake=normalised.report,
-            )
-        except Exception as exc:
-            raise HTTPException(
-                400,
-                "CA-Guard could not analyse this file. It was read and its columns "
-                f"were recognised, but the analysis failed: {exc}",
-            ) from exc
-
         return _queue(workspace, analysis)
 
     @app.get("/api/engagements/{engagement_id}/queue", response_model=QueueOut)
@@ -291,6 +284,74 @@ def create_app(
         return HTMLResponse(to_html(analysis.engagement, rows))
 
     return app
+
+
+async def _receive(file: UploadFile, directory: Path, suffix: str, display_name: str) -> Path:
+    """Copy an upload to a private temporary file, refusing it once it is too big.
+
+    The name is unique per request: a shared name meant two simultaneous
+    uploads could read each other's ledger.
+    """
+    directory.mkdir(parents=True, exist_ok=True)
+    handle = tempfile.NamedTemporaryFile(  # noqa: SIM115 - closed below, unlinked by caller
+        dir=directory, prefix="upload-", suffix=suffix, delete=False
+    )
+    path = Path(handle.name)
+    received = 0
+    try:
+        with handle:
+            while chunk := await file.read(UPLOAD_CHUNK_BYTES):
+                received += len(chunk)
+                if received > MAX_UPLOAD_BYTES:
+                    raise HTTPException(
+                        413,
+                        f"{display_name} is larger than "
+                        f"{MAX_UPLOAD_BYTES // 1024 // 1024} MB. Nothing was saved.",
+                    )
+                handle.write(chunk)
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
+    return path
+
+
+def _analyse_upload(workspace: Workspace, path: Path, display_name: str) -> Analysis:
+    """Read, normalise and analyse one uploaded file. Runs in a worker thread.
+
+    Every failure becomes a message the reviewer can act on. Anything unexpected
+    is logged with an error id the reviewer can quote, and the message says what
+    did not happen rather than showing an internal exception.
+    """
+    try:
+        raw = read_table(path, display_name=display_name)
+    except IntakeError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+    # A real ledger does not arrive in our schema. Map it, derive what can be
+    # derived, and say plainly what the file did not contain.
+    try:
+        normalised = normalise(raw)
+    except NormalisationError as exc:
+        raise HTTPException(400, f"{display_name}: {exc}") from exc
+
+    try:
+        return workspace.analyse(normalised.lines, source=display_name, intake=normalised.report)
+    except Exception as exc:
+        error_id = secrets.token_hex(4)
+        # Metadata only. Not the traceback: exception text from the data layer can
+        # quote cell values, and a log file must never become a copy of a ledger.
+        # The failure reproduces locally with `caguard review <file>`.
+        logger.error(
+            "analysis failed error_id=%s error_type=%s rows=%d",
+            error_id,
+            type(exc).__name__,
+            len(normalised.lines),
+        )
+        raise HTTPException(
+            500,
+            f"{display_name} was read and its columns were recognised, but the analysis "
+            f"could not be completed. Nothing was saved. Error reference: {error_id}.",
+        ) from exc
 
 
 def _queue(workspace: Workspace, analysis: Analysis) -> QueueOut:

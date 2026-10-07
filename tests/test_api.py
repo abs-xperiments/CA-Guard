@@ -197,7 +197,11 @@ def test_an_unreadable_upload_gives_a_readable_error(client: TestClient) -> None
         "/api/engagements", files={"file": ("notes.docx", b"nonsense", "text/plain")}
     )
     assert response.status_code == 400
-    assert "Unsupported file type" in response.json()["detail"]
+    detail = response.json()["detail"]
+    # Names the file the user chose, says what is accepted, and what did not happen.
+    assert "notes.docx" in detail
+    assert ".xlsx" in detail
+    assert "Nothing was saved" in detail
 
 
 def test_an_empty_upload_is_refused(client: TestClient) -> None:

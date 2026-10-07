@@ -1,5 +1,5 @@
 # Everything here runs locally and costs nothing.
-.PHONY: help install lint fmt types test test-all data generate check clean
+.PHONY: help install lint fmt types test test-all data generate check clean smoke
 
 help:
 	@grep -E '^[a-z-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -30,6 +30,10 @@ audit:  ## Check dependencies for known vulnerabilities (free, no account)
 
 benchmark:  ## Regenerate every number the project claims
 	uv run caguard benchmark --out docs/RESULTS.md
+
+smoke:  ## End-to-end check through the built workspace (needs `make web-install` + build)
+	cd web && npm run build
+	uv run python scripts/smoke_workspace.py
 
 docker:  ## Build and run the self-hosted image on 127.0.0.1:3000
 	docker compose up --build
