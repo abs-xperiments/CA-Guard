@@ -942,3 +942,22 @@ Everything that can be done without your accounts is done. Deploying to Railway 
 
 **Next step:** Phase 9, once you've done the Railway steps; then Phase 10, testing the live site end to end.
 
+
+---
+
+## 2026-10-08 01:53 IST — [PHASE 9 of completion] [CREDENTIALS NEEDED] Ready to deploy; waiting for your Railway sign-in.
+
+**What happened:** the deployable container is finished and tested on this Mac the way Railway will run it.
+- It installs the exact library versions our tests ran against.
+- It runs as an ordinary user, and can't modify its own code.
+- If either half crashes, it stops so Railway restarts it.
+- It keeps all data across a restart.
+- In demo mode it refuses to start with a weak invite code.
+
+A first build found one missing system library, which the new crash handling exposed immediately instead of hiding. Fixed.
+
+**What's blocking:** the Railway command-line tool on this Mac isn't signed in, and signing in has to be done by you in a browser. Railway also needs to be on the Hobby plan ($5/month; the free plan doesn't have enough memory), which you approved in principle as D-053.
+
+**Founder action required:** the numbered steps are in my message. Nothing else is needed from you. Once you're signed in, I do the rest and then test the live site end to end (Phase 10).
+
+**Tests/checks:** 678 tests ✅ · 4 browser tests ✅ · container: functional, restart, crash and demo-mode checks ✅
