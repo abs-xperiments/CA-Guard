@@ -202,7 +202,33 @@ def test_docker_files_reference_what_exists() -> None:
     assert 'output: "standalone"' in (ROOT / "web" / "next.config.ts").read_text(), (
         "the image copies .next/standalone, which Next only produces on request"
     )
-    assert "USER caguard" in dockerfile, "the container must not run as root"
+    # The image starts as root only so the entrypoint can hand platform volumes
+    # (mounted root-owned on Railway) to the app user; the application itself
+    # must never run as root. Enforced in the entrypoint, checked here.
+    assert "useradd --create-home --uid 10001 caguard" in dockerfile
+
+
+def test_the_application_never_runs_as_root() -> None:
+    """Root is used for one job — owning /data — then dropped for good, capabilities and all.
+
+    Verified at runtime too (docs/deploy.md): every process uid 10001, CapEff 0.
+    """
+    entrypoint = (ROOT / "docker" / "entrypoint.sh").read_text()
+    drop = entrypoint.index("exec setpriv --reuid=caguard --regid=caguard")
+    assert "--inh-caps=-all" in entrypoint and "--bounding-set=-all" in entrypoint
+    root_block = entrypoint[entrypoint.index('if [ "$(id -u)" = "0" ]') : drop]
+    # The only things done as root: create /data and give it to the app user.
+    commands = [
+        line.strip()
+        for line in root_block.splitlines()[1:]
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    assert commands == [
+        "mkdir -p /data",
+        "find /data -xdev ! -user caguard -exec chown caguard:caguard {} +",
+    ], commands
+    assert drop < entrypoint.index("python -m caguard.cli serve"), "drop privileges before starting"
+    assert drop < entrypoint.index("node web/server.js")
 
 
 def test_the_container_does_not_publish_the_api() -> None:
