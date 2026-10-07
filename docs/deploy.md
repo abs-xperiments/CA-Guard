@@ -8,7 +8,7 @@ Two paths, and they are not the same product.
 | Data | Real client ledgers | **Synthetic only** |
 | Privacy claim | Nothing leaves the machine | None — it is a demonstration |
 | Cost | ₹0 | Monthly hosting |
-| Status | ✅ Built and tested | ✅ **Prepared.** Steps below; not deployed. |
+| Status | ✅ Built and tested | ✅ **Live** at <https://ca-guard-production.up.railway.app> (deployed and verified 2026-10-08 02:22 IST) |
 
 The distinction is not marketing. D-005 exists because calling a cloud-hosted demo "on-premise" would be untrue, and a CA relying on that sentence would be misled about where their client's data sits.
 
@@ -104,7 +104,7 @@ curl -s http://127.0.0.1:3000/api/health
 
 ## Public demo on Railway
 
-**Prepared and verified locally; not yet deployed** (2026-10-08 01:52 IST). Deploying needs the founder's Railway account (sign-in is interactive) and the Hobby plan. Once the CLI on this machine is signed in, the steps below are run by Claude.
+**Live**, after being prepared and verified locally (2026-10-08 01:52 IST). Deploying needs the founder's Railway account (sign-in is interactive) and the Hobby plan. Once the CLI on this machine is signed in, the steps below are run by Claude.
 
 ### The image, verified as Railway will run it
 
@@ -160,6 +160,39 @@ railway logs                                  # read, don't guess, if anything f
 ```
 
 The invite code is generated straight into Railway and never printed into this repository or the journal. To read it: `railway variables`, or the service's **Variables** tab in the Railway dashboard.
+
+### Live verification (2026-10-08 02:22 IST)
+
+Run against the live URL after deployment.
+
+**Without an account — 23 of 23 pass:**
+- HTTPS health, reporting demo mode;
+- pages and deep links load;
+- CSP, HSTS, `nosniff` and DENY framing are present;
+- every ledger route returns 401;
+- sign-up is refused without the invite code, and with a wrong one;
+- no API docs;
+- no secrets in the browser scripts;
+- the demo banner text is shipped.
+
+**Signed in, as a throwaway test account — 17 of 17 pass:**
+- the cookie is Secure, HttpOnly and SameSite=Lax;
+- the sample ledger runs as a background analysis (3.9 s; 82 findings of 1,533 vouchers);
+- the explanation card, transaction lines with source rows, and the deterministic written explanation;
+- a decision recorded and persisted;
+- the original download is byte-identical;
+- the report separates observed from decided, under a strict CSP; the CSV downloads;
+- in a real browser: the demo banner, a deep link, and zero console errors.
+
+**Persistence:** after a redeploy, the account, engagement and decision survived on the volume.
+
+**Reset for handover:** the volume holding the test data was replaced with an empty one, and the service redeployed. The site then reported `any_users: false`, and the test login was rejected. The first person to sign up with the invite code becomes the administrator.
+
+**Lessons from deploying:**
+- Railway rejects `VOLUME` in a Dockerfile. The error appears in the dashboard's build log, not the CLI's.
+- Railway volumes are mounted root-owned; the entrypoint hands `/data` to the app user and then drops all privileges.
+- Railway injects `PORT` (8080 here). The domain targets that port; nothing hard-codes 3000.
+- The trial volume is **500 MB**. The Hobby plan allows more. Stored originals count against it.
 
 ### After it is live
 

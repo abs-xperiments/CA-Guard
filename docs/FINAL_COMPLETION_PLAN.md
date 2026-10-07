@@ -383,7 +383,7 @@ Both need a benchmark re-run before any change.
 - usable at tablet width;
 - no gratuitous animation.
 
-### Phase 9 — Deployment — 🟡 prepared and verified locally (2026-10-08 01:52 IST); **blocked on the founder's Railway sign-in**
+### Phase 9 — Deployment — ✅ done 2026-10-08 02:22 IST
 
 **Done:**
 - the image hardened (lockfile install, read-only code, exact Node, fail-fast entrypoint);
@@ -395,7 +395,12 @@ Both need a benchmark re-run before any change.
 - the hosted demo is deployed per FD-1 with `CAGUARD_DEMO=1`, an invite code, a persistent volume and HTTPS-only cookies;
 - the environment variables are documented.
 
-### Phase 10 — Production smoke test
+### Phase 10 — Production smoke test — ✅ done 2026-10-08 02:22 IST
+
+- 23/23 public checks and 17/17 signed-in checks pass on the live URL.
+- Persistence across a redeploy is verified.
+- The test data was then removed (by replacing the volume) so the founder's sign-up becomes the administrator.
+- Details in `docs/deploy.md`.
 **Acceptance:** the full checklist from the founder's brief is run against the **live** URL, recorded in `docs/deploy.md` with date, time and results. Only then is it called "deployed".
 
 ---

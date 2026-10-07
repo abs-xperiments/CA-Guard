@@ -979,3 +979,23 @@ A first build found one missing system library, which the new crash handling exp
 **Also worth knowing:** this Mac's shell has an old `RAILWAY_TOKEN` setting that overrides your login. I worked around it for my commands; removing it from your shell profile will stop it confusing future Railway commands.
 
 **Founder action required:** the steps are in my message.
+
+---
+
+## 2026-10-08 02:22 IST — [PHASES 9–10 of completion] CA-Guard is live and verified: https://ca-guard-production.up.railway.app
+
+**What happened:**
+- **The real cause of the failed deploys was a line in our container recipe that Railway doesn't allow.** It wasn't the account, as I'd thought. You found it in the dashboard; the command-line log hadn't shown it. One line removed, and it deployed first time.
+- **I then tested the live site the way a visitor would.**
+  - Without an account, 23 checks pass. These include: secure pages, nothing reachable without signing in, the invite code enforced, no technical documentation exposed, no secrets in what the browser downloads, and the demo banner shown.
+  - With a test account, 17 checks pass. These include: the sample ledger analysed in about 4 seconds; the full explanation for a finding; a decision saved; the original file downloaded byte for byte; the report; links to a finding; and no errors in the browser.
+- **Data survives a restart:** after redeploying, everything I'd done was still there.
+- **Then I wiped my test data.** I replaced the storage with an empty one, so **the first person to sign up becomes the administrator; that should be you.** Confirmed: the site has no accounts, and my test login no longer works.
+
+**For you:**
+- The site is a **demonstration on synthetic data**. The banner says so on every page. **No real client ledger should ever be uploaded to it.** For real client work, CA-Guard runs on the firm's own machine (`docker compose up`).
+- **Invite code:** Railway dashboard → project **ca-guard-demo** → service **ca-guard** → **Variables** → `CAGUARD_INVITE_CODE`. Use it to create your account first; then share it with faculty. Each visitor sees only their own work.
+- **Storage:** the demo's volume is 500 MB. Every uploaded file is kept, so it will fill up eventually. The Hobby plan allows more.
+
+**Git:** all commits pushed to GitHub (see below).
+
