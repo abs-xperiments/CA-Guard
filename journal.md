@@ -601,3 +601,50 @@ Every page that touches a ledger now requires signing in. I checked each one ind
 **Credentials needed: none.** Everything generates itself. For the Railway deployment you'll want to set one invite code, which I've put in the steps below.
 
 **Next:** deployment steps for you — everything else is done.
+
+---
+
+## 2026-10-07 21:10 IST — [AUDIT] Full re-sync before the final push. The engine is good; the shell around it is not finished.
+
+**What happened:**
+Before changing anything, I re-read the whole project. Then I actually *used* it the way a CA would: signed up, uploaded ledgers through the real screen, opened findings, asked for explanations, recorded a decision, restarted the server and came back. I also re-ran every check and the full benchmark. The complete findings and the plan are in `docs/FINAL_COMPLETION_PLAN.md`.
+
+**What's in good shape:**
+- All the checks pass: 534 tests, lint and type checks.
+- The benchmark reproduced its published numbers exactly. The research result still stands: knowing whether an entry has supporting evidence is what makes the ranking useful, and the machine-learning layer adds nothing. That negative result stays in.
+- The explanation layer still cannot make things up.
+- Decisions survive a restart, and nobody can sign as someone else.
+
+**What I found that a CA would hit tomorrow morning:**
+1. **Any ledger over 10 MB fails when uploaded through the screen.** The analysis engine itself handles it fine (36,000 vouchers in 13 seconds), but the web layer in front silently cuts the file off. Earlier tests talked to the engine directly, so they never saw this.
+2. **While one ledger is being analysed, the whole app freezes for everyone.** I measured a simple status check taking 12 seconds.
+3. **After a restart, every ledger has to be uploaded again.** The app still lists it, but opening it says "upload again". This is the "where did my ledger go?" problem you described, and it exists because CA-Guard currently never keeps the uploaded file.
+4. **CSV files saved by Excel on Windows are rejected**, because of the way they store characters. Old-style `.xls` files are listed as supported but cannot actually be read.
+5. **The explanation shows codes, not the transaction.** It says "accounts 5700 and 2400", not their names, and it shows no narration, no party, and no debit/credit lines. The data is all there; it just isn't displayed.
+6. **"Accept" is ambiguous.** In CA-Guard it means "yes, this is an exception to follow up". Most accountants would read it as "the entry is fine". That is how a wrong conclusion gets into an audit file.
+7. **The "statistically unusual" badge appears on most high-priority rows**, even though it contributes about 2% and our own research says it adds nothing. The screen overstates the ML layer.
+
+**Security:**
+- **The login key was saved into Git** in the Railway commit. It has **not** left your computer (your local copy is 15 commits ahead of GitHub). I removed it from tracking and generated a fresh one, so the old one is useless even when this history is pushed.
+  - Side effect: if you were signed in to a local copy, you will need to sign in again.
+- **The web framework has a newly published critical security advisory.** We don't use the affected feature, but it gets patched first thing.
+- Hosted logins wouldn't be marked "HTTPS only".
+- There's no limit on password guessing.
+
+**About Netlify (you asked for it):** I checked Netlify's own documentation.
+- **Netlify cannot run CA-Guard's analysis engine.** It has no Python, no containers and no permanent storage.
+- It could host the screens, but the engine would still need a paid host somewhere else, and the link between the two cuts off any request longer than 26 seconds.
+- Details and options are in the plan as **FD-1**.
+
+**Tests/checks:** ruff ✅ · pyright ✅ · 534 tests ✅ · TypeScript ✅ · benchmark reproduced ✅ · Python dependency audit ✅ · web dependency audit ❌ (3 advisories, fix planned in Phase 1).
+
+**Git commit:** this audit, the plan, and the key removal.
+
+**[FOUNDER DECISION] needed (only these three):**
+- **FD-1 Hosting:** recommendation is Railway ($5/month) for the whole app. Netlify can't run it alone.
+- **FD-2 How long uploaded files are kept:** recommendation is until the reviewer deletes them on a firm's own machine, and auto-deleted after 7 days on the public demo.
+- **FD-3 Button wording:** recommendation is "Exception — follow up" / "Cleared — not a concern" / "Investigate".
+
+**Credentials needed:** none yet. Only once you choose a host.
+
+**Next step:** Phase 1, the critical fixes. None of them depend on your decisions, so they can start immediately.

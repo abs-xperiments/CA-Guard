@@ -34,3 +34,7 @@ out/
 # Local review database — a firm's decisions, never committed
 data/review.db
 data/*.db
+
+# Session signing key — generated per installation on first run, never shared
+data/session.key
+*.key
