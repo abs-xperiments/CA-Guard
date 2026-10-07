@@ -10,6 +10,19 @@
 # rather than leaving a workspace that answers with no engine behind it.
 set -euo pipefail
 
+# Hosting platforms (Railway among them) mount volumes owned by root, and the
+# application runs as an unprivileged user that could then not write its own
+# database. So the container starts as root for exactly one job — handing /data
+# to that user — and then becomes that user for good, with every Linux
+# capability dropped, before anything else runs. Running the whole container as
+# root (the platform's suggested workaround) would throw that protection away.
+if [ "$(id -u)" = "0" ]; then
+    mkdir -p /data
+    find /data -xdev ! -user caguard -exec chown caguard:caguard {} +
+    exec setpriv --reuid=caguard --regid=caguard --init-groups \
+        --inh-caps=-all --bounding-set=-all "$0" "$@"
+fi
+
 python -m caguard.cli serve \
     --host 127.0.0.1 \
     --port 8000 \

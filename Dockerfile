@@ -69,7 +69,9 @@ RUN chmod 0755 /usr/local/bin/caguard-entrypoint
 RUN mkdir -p /data && chown caguard:caguard /data
 VOLUME ["/data"]
 
-USER caguard
+# No USER here: the entrypoint starts as root only to hand /data (which
+# platforms mount root-owned) to the caguard user, then drops to it for good
+# with every capability removed. Nothing in the application ever runs as root.
 ENV CAGUARD_STORE=/data/review.db \
     CAGUARD_MODEL=none \
     PORT=3000 \
