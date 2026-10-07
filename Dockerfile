@@ -67,7 +67,10 @@ RUN chmod 0755 /usr/local/bin/caguard-entrypoint
 # originals. The code itself stays root-owned, so a compromised process cannot
 # rewrite what it runs.
 RUN mkdir -p /data && chown caguard:caguard /data
-VOLUME ["/data"]
+# No VOLUME instruction: Railway rejects it ("use Railway Volumes"), and the
+# storage is attached where it is run instead — compose.yaml mounts the
+# caguard-data volume at /data for self-hosting; Railway attaches its own.
+# Without either, data would not survive the container being replaced.
 
 # No USER here: the entrypoint starts as root only to hand /data (which
 # platforms mount root-owned) to the caguard user, then drops to it for good
