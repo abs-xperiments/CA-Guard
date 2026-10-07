@@ -364,6 +364,9 @@ def serve(
     typer.echo(f"  API docs            →  http://{host}:{port}/docs")
     typer.echo(f"  decisions stored in →  {store}")
     typer.echo(f"  explanation model   →  {model}\n")
+    from caguard.observability import configure_logging
+
+    configure_logging()
     uvicorn.run(create_app(store, model=model), host=host, port=port, log_level="warning")
 
 

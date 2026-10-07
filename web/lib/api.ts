@@ -16,6 +16,7 @@ import type {
   SignupState,
   SourceFile,
   SourcePreview,
+  UploadJob,
   User,
 } from "./types";
 
@@ -96,6 +97,43 @@ export const api = {
     body.append("file", file);
     return request<Queue>("/api/engagements", { method: "POST", body });
   },
+
+  /**
+   * Send a ledger for background analysis, reporting bytes sent as it goes.
+   * XMLHttpRequest rather than fetch: only it reports upload progress, and a
+   * large file on a slow connection should not look frozen.
+   */
+  startUpload: (file: File, onProgress: (fraction: number) => void) =>
+    new Promise<UploadJob>((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/uploads");
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) onProgress(event.loaded / event.total);
+      };
+      xhr.onload = () => {
+        let body: { detail?: unknown } & Partial<UploadJob> = {};
+        try {
+          body = JSON.parse(xhr.responseText);
+        } catch {
+          /* fall through to the status text */
+        }
+        if (xhr.status >= 200 && xhr.status < 300) resolve(body as UploadJob);
+        else
+          reject(
+            new ApiError(
+              typeof body.detail === "string" ? body.detail : xhr.statusText || "Upload failed",
+              xhr.status,
+            ),
+          );
+      };
+      xhr.onerror = () =>
+        reject(new ApiError("Cannot reach CA-Guard. Nothing was uploaded.", 0));
+      const form = new FormData();
+      form.append("file", file);
+      xhr.send(form);
+    }),
+
+  job: (id: string) => request<UploadJob>(`/api/jobs/${id}`),
 
   queue: (id: string) => request<Queue>(`/api/engagements/${id}/queue`),
 

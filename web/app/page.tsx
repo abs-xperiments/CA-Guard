@@ -9,10 +9,11 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { UploadProgress } from "@/components/UploadProgress";
 import { useRouter } from "next/navigation";
 import { FileUp, FolderOpen, LogOut, ShieldCheck } from "lucide-react";
 import { ApiError, api, auth } from "@/lib/api";
-import type { EngagementSummary, User } from "@/lib/types";
+import type { EngagementSummary, UploadJob, User } from "@/lib/types";
 import { whenIST } from "@/lib/types";
 import { Button, EmptyState, ErrorState, Spinner } from "@/components/ui";
 
@@ -22,6 +23,10 @@ export default function Home() {
   const [engagements, setEngagements] = useState<EngagementSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [lastFile, setLastFile] = useState<File | null>(null);
+  const [sent, setSent] = useState(0);
+  const [job, setJob] = useState<UploadJob | null>(null);
   const [dragging, setDragging] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
@@ -48,16 +53,28 @@ export default function Home() {
 
   async function open(file: File) {
     setUploading(true);
-    setError(null);
+    setUploadError(null);
+    setLastFile(file);
+    setSent(0);
+    setJob(null);
     try {
-      const queue = await api.upload(file);
-      router.push(`/review/${queue.engagement.id}`);
+      let current = await api.startUpload(file, setSent);
+      setJob(current);
+      // Poll the analysis; it reports each stage as it reaches it.
+      while (current.state === "queued" || current.state === "running") {
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        current = await api.job(current.id);
+        setJob(current);
+      }
+      if (current.state === "done" && current.engagement_id) {
+        router.push(`/review/${current.engagement_id}`);
+        return;
+      }
+      setUploadError(current.error ?? "The analysis did not finish. Nothing was saved.");
     } catch (caught) {
-      setError(
-        caught instanceof ApiError ? caught.message : "Could not read that file.",
-      );
-      setUploading(false);
+      setUploadError(caught instanceof ApiError ? caught.message : "Could not read that file.");
     }
+    setUploading(false);
   }
 
   return (
@@ -118,23 +135,39 @@ export default function Home() {
           dragging ? "border-accent bg-accent-soft" : "border-line bg-surface"
         }`}
       >
-        <FileUp size={28} className="mx-auto text-ink-faint" />
-        <p className="mt-3 text-sm font-medium text-ink">
-          Drop a ledger here, or choose a file
-        </p>
-        <p className="mt-1 text-[13px] text-ink-muted">
-          CSV, Excel or Parquet. The file stays on the computer running CA-Guard, kept
-          exactly as uploaded so you can download it again.
-        </p>
-        <div className="mt-5 flex justify-center">
-          {uploading ? (
-            <Spinner label="Reading and analysing the ledger…" />
-          ) : (
-            <Button variant="primary" onClick={() => input.current?.click()}>
-              Choose a file
-            </Button>
-          )}
-        </div>
+        {uploading && lastFile ? (
+          <UploadProgress filename={lastFile.name} sent={sent} job={job} />
+        ) : (
+          <>
+            <FileUp size={28} className="mx-auto text-ink-faint" />
+            <p className="mt-3 text-sm font-medium text-ink">
+              Drop a ledger here, or choose a file
+            </p>
+            <p className="mt-1 text-[13px] text-ink-muted">
+              CSV, Excel or Parquet. The file stays on the computer running CA-Guard, kept
+              exactly as uploaded so you can download it again.
+            </p>
+            {uploadError ? (
+              <div
+                role="alert"
+                className="mx-auto mt-4 max-w-lg rounded-md border border-high/25 bg-high-soft px-4 py-3 text-left"
+              >
+                <p className="text-sm font-semibold text-high">
+                  {lastFile ? `${lastFile.name} was not opened` : "The file was not opened"}
+                </p>
+                <p className="mt-1 text-[13px] text-high/85">{uploadError}</p>
+              </div>
+            ) : null}
+            <div className="mt-5 flex justify-center gap-2">
+              {uploadError && lastFile ? (
+                <Button onClick={() => void open(lastFile)}>Try the same file again</Button>
+              ) : null}
+              <Button variant="primary" onClick={() => input.current?.click()}>
+                {uploadError ? "Choose another file" : "Choose a file"}
+              </Button>
+            </div>
+          </>
+        )}
         <input
           ref={input}
           type="file"

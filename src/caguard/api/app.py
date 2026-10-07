@@ -27,6 +27,7 @@ from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from caguard.api.auth_routes import build_auth_router, current_user_dependency
+from caguard.api.jobs import JobRunner, Progress
 from caguard.api.models import (
     DecisionIn,
     DecisionOut,
@@ -35,6 +36,7 @@ from caguard.api.models import (
     ExplanationOut,
     FindingOut,
     IntakeReportOut,
+    JobOut,
     QueueOut,
     RenameIn,
 )
@@ -52,6 +54,7 @@ from caguard.intake.readers import (
     read_table,
     safe_suffix,
 )
+from caguard.observability import event
 from caguard.review.decisions import Decision, ReviewAction
 from caguard.review.finding import RiskBand
 from caguard.review.report import build_rows, to_csv, to_html
@@ -90,6 +93,8 @@ def create_app(
         version="0.1.0",
     )
     app.state.workspace = workspace
+    jobs = JobRunner()
+    app.state.jobs = jobs
     app.state.users = users
     app.include_router(build_auth_router(users, data_dir, signing_key))
 
@@ -139,21 +144,45 @@ def create_app(
             analysis.engagement = renamed
         return EngagementOut.build(renamed)
 
+    @app.post("/api/uploads", response_model=JobOut, status_code=202)
+    async def start_upload(file: UploadFile, user: User = signed_in) -> JobOut:
+        """Upload a ledger and analyse it in the background; poll the job for progress.
+
+        This is what the workspace uses. The file is received now (so a
+        rejected type or size is answered at once); reading and analysis run
+        on the job pool and report their stage as they go.
+        """
+        display_name, suffix = _accepted(file)
+        temp = await _receive(file, Path(workspace.store.path).parent, suffix, display_name)
+        event(logger, "upload.received", size_bytes=temp.stat().st_size, kind=suffix)
+
+        def work(progress: Progress) -> str:
+            try:
+                return _ingest(workspace, temp, suffix, display_name, user, progress).engagement.id
+            finally:
+                temp.unlink(missing_ok=True)
+
+        return JobOut.build(jobs.submit(user.id, work))
+
+    @app.get("/api/jobs/{job_id}", response_model=JobOut)
+    def job_status(job_id: str, user: User = signed_in) -> JobOut:
+        job = jobs.get(job_id, user.id)
+        if job is None:
+            # Unknown, someone else's, or forgotten after a restart: the same
+            # answer for each, and an instruction that works for all of them.
+            raise HTTPException(
+                404, "That upload is no longer being tracked. Upload the file again."
+            )
+        return JobOut.build(job)
+
     @app.post("/api/engagements", response_model=QueueOut)
     async def upload(file: UploadFile, user: User = signed_in) -> QueueOut:
-        """Upload a ledger, analyse it, and return the review queue."""
-        display_name = Path(file.filename or "uploaded ledger").name or "uploaded ledger"
+        """Upload a ledger, analyse it, and return the review queue in one request.
 
-        # Never build a path from an uploaded filename: only a suffix we
-        # recognise is carried across.
-        suffix = safe_suffix(file.filename)
-        if not suffix:
-            raise HTTPException(
-                400,
-                f"{display_name} is not a file type CA-Guard reads. Upload "
-                f"{', '.join(sorted(SUPPORTED_SUFFIXES))}. Nothing was saved.",
-            )
-
+        Kept for scripts and the CLI; the workspace uses /api/uploads instead.
+        Both run the same pipeline.
+        """
+        display_name, suffix = _accepted(file)
         temp = await _receive(file, Path(workspace.store.path).parent, suffix, display_name)
         try:
             # Parsing and analysis are CPU-bound and can take seconds on a full
@@ -211,6 +240,15 @@ def create_app(
             raise HTTPException(404, f"No finding for voucher {voucher_id!r}")
 
         result = workspace.explanation_service().explain(found)
+        event(
+            logger,
+            "explanation.generated",
+            engagement=engagement_id,
+            source=result.source.value,
+            provider=result.provider,
+            fell_back=result.fallback_reason is not None,
+            seconds=result.latency_seconds,
+        )
         return ExplanationOut(
             voucher_id=result.voucher_id,
             text=result.text,
@@ -252,6 +290,7 @@ def create_app(
     def report_csv(engagement_id: str, user: User = signed_in) -> PlainTextResponse:
         analysis = workspace.require(engagement_id)
         rows = build_rows(analysis.findings, workspace.store.current(engagement_id))
+        event(logger, "report.generated", engagement=engagement_id, format="csv", rows=len(rows))
         return PlainTextResponse(
             to_csv(rows),
             media_type="text/csv",
@@ -264,6 +303,7 @@ def create_app(
     def report_html(engagement_id: str, user: User = signed_in) -> HTMLResponse:
         analysis = workspace.require(engagement_id)
         rows = build_rows(analysis.findings, workspace.store.current(engagement_id))
+        event(logger, "report.generated", engagement=engagement_id, format="html", rows=len(rows))
         return HTMLResponse(
             to_html(
                 analysis.engagement,
@@ -286,6 +326,23 @@ def _text_or_none(value: object) -> str | None:
 def demo_mode() -> bool:
     """Set on a hosted deployment (D-005, D-052): banner on, users isolated."""
     return os.environ.get("CAGUARD_DEMO", "").strip().lower() in {"1", "true", "yes"}
+
+
+def _accepted(file: UploadFile) -> tuple[str, str]:
+    """The name to show the reviewer, and a suffix safe to use in a path.
+
+    Never build a path from an uploaded filename: only a suffix we recognise
+    is carried across.
+    """
+    display_name = Path(file.filename or "uploaded ledger").name or "uploaded ledger"
+    suffix = safe_suffix(file.filename)
+    if not suffix:
+        raise HTTPException(
+            400,
+            f"{display_name} is not a file type CA-Guard reads. Upload "
+            f"{', '.join(sorted(SUPPORTED_SUFFIXES))}. Nothing was saved.",
+        )
+    return display_name, suffix
 
 
 async def _receive(file: UploadFile, directory: Path, suffix: str, display_name: str) -> Path:
@@ -318,7 +375,12 @@ async def _receive(file: UploadFile, directory: Path, suffix: str, display_name:
 
 
 def _ingest(
-    workspace: Workspace, path: Path, suffix: str, display_name: str, user: User
+    workspace: Workspace,
+    path: Path,
+    suffix: str,
+    display_name: str,
+    user: User,
+    progress: Progress | None = None,
 ) -> Analysis:
     """Analyse and keep one upload, turning any failure into a message to act on.
 
@@ -329,7 +391,12 @@ def _ingest(
     """
     try:
         return workspace.ingest(
-            path, suffix, display_name, uploaded_by=user.display_name, owner_id=user.id
+            path,
+            suffix,
+            display_name,
+            uploaded_by=user.display_name,
+            owner_id=user.id,
+            progress=progress,
         )
     except HTTPException:
         raise
@@ -338,7 +405,13 @@ def _ingest(
         # Metadata only. Not the traceback: exception text from the data layer can
         # quote cell values, and a log file must never become a copy of a ledger.
         # The failure reproduces locally with `caguard review <file>`.
-        logger.error("analysis failed error_id=%s error_type=%s", error_id, type(exc).__name__)
+        event(
+            logger,
+            "analysis.failed",
+            logging.ERROR,
+            error_id=error_id,
+            error_type=type(exc).__name__,
+        )
         raise HTTPException(
             500,
             f"{display_name} was read and its columns were recognised, but the analysis "

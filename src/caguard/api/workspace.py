@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import logging
 import threading
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
@@ -24,6 +26,7 @@ from caguard.explain.ollama import OllamaProvider
 from caguard.explain.service import ExplanationService
 from caguard.intake.normalise import NormalisationError, NormalisationReport, normalise
 from caguard.intake.readers import IntakeError, read_table
+from caguard.observability import event
 from caguard.review.engagement import Engagement, ledger_hash, open_engagement
 from caguard.review.finding import Finding
 from caguard.review.fusion import build_findings
@@ -171,14 +174,23 @@ class Workspace:
         display_name: str,
         uploaded_by: str,
         owner_id: str = "",
+        progress: Callable[[str], None] | None = None,
     ) -> Analysis:
         """Read, analyse and keep one uploaded file. Runs in a worker thread.
 
         The file is kept only once the analysis has succeeded, so a file
         CA-Guard could not use is never stored.
         """
+        report = progress or (lambda _stage: None)
+        timer = _Timer()
+
+        report("reading")
         raw = _read(path, display_name)
+        timer.lap("read")
+        report("mapping")
         normalised = _normalise(raw, display_name)
+        timer.lap("map")
+        report("analysing")
         analysis = self.analyse(
             normalised.lines,
             source=display_name,
@@ -186,7 +198,9 @@ class Workspace:
             raw=raw,
             owner_id=owner_id,
         )
+        timer.lap("analyse")
 
+        report("keeping")
         stored = self.vault.keep(path, suffix)
         source = self.store.add_source(
             SourceFile(
@@ -202,6 +216,21 @@ class Workspace:
         )
         if analysis.source is None:
             analysis.source = source
+        timer.lap("keep")
+
+        # Counts and timings only — see caguard.observability.
+        event(
+            logger,
+            "analysis.completed",
+            engagement=analysis.engagement.id,
+            rows_read=normalised.report.rows_in,
+            rows_used=normalised.report.rows_out,
+            unreadable_dates=normalised.report.unreadable_dates,
+            vouchers=analysis.engagement.voucher_count,
+            findings=len(analysis.findings),
+            size_bytes=stored.size_bytes,
+            **timer.seconds(),
+        )
         return analysis
 
     # --- finding an engagement again -----------------------------------------
@@ -247,10 +276,10 @@ class Workspace:
             try:
                 path = self.vault.verified_path(source.sha256, source.suffix)
             except FileNotFoundError:
-                logger.error("stored original missing source_id=%s", source.id)
+                event(logger, "source.missing", logging.ERROR, source=source.id)
                 continue
             except SourceIntegrityError:
-                logger.error("stored original failed its hash check source_id=%s", source.id)
+                event(logger, "source.hash_mismatch", logging.ERROR, source=source.id)
                 continue
 
             raw = _read(path, source.filename)
@@ -259,7 +288,7 @@ class Workspace:
                 # The file now reads as a different book — most likely a newer
                 # build normalises it differently. Saying so beats quietly
                 # showing findings the recorded decisions were not made on.
-                logger.error("rebuilt ledger hash differs source_id=%s", source.id)
+                event(logger, "engagement.rebuild_mismatch", logging.ERROR, source=source.id)
                 continue
 
             context = build_context(normalised.lines)
@@ -273,6 +302,7 @@ class Workspace:
                 context=context,
             )
             self._record_stats(rebuilt)
+            event(logger, "engagement.rebuilt", engagement=engagement.id, source=source.id)
             return rebuilt
 
         raise HTTPException(
@@ -280,6 +310,22 @@ class Workspace:
             "CA-Guard could not re-open this engagement from its stored original. Upload "
             "the ledger again to continue; the decisions already recorded are kept.",
         )
+
+
+class _Timer:
+    """Wall-clock time per stage, for the completion event."""
+
+    def __init__(self) -> None:
+        self._last = time.perf_counter()
+        self._laps: dict[str, float] = {}
+
+    def lap(self, name: str) -> None:
+        now = time.perf_counter()
+        self._laps[f"seconds_{name}"] = now - self._last
+        self._last = now
+
+    def seconds(self) -> dict[str, float]:
+        return {**self._laps, "seconds_total": sum(self._laps.values())}
 
 
 def _read(path: Path, display_name: str) -> pd.DataFrame:

@@ -798,3 +798,32 @@ Before changing anything, I re-read the whole project. Then I actually *used* it
 
 **Next step:** Phase 5. Uploads become a background job with a visible progress indicator (reading → mapping → analysing → ranking), because a full year's ledger takes about 11 seconds to analyse and the screen shouldn't just sit there. Logging will cover every step without ever recording client data.
 
+---
+
+## 2026-10-07 23:34 IST — [PHASE 5 of completion] Uploading shows what's happening, analysis is twice as fast, and the logs can't hold client data.
+
+**What happened:**
+- **Uploading no longer just sits there.** After you choose a file the screen shows:
+  - "Sending the file — 42%";
+  - then each step as it happens: reading the file → recognising the columns → analysing every voucher → keeping the original;
+  - then it opens the review on its own.
+  
+  If several people upload at once, it says it is waiting rather than looking stuck.
+- **If something goes wrong**, the screen says which file wasn't opened and why, and offers **Try the same file again** without making you find it again. Before, that button only reloaded the list.
+- **Analysis is more than twice as fast.** I first measured where the time actually went: almost all of it was in one routine that walked through the vouchers inefficiently. Fixing it took a 30,000-voucher ledger from about 11 seconds to under 5, with exactly the same findings. The research benchmark came out identical to the last digit.
+- **CA-Guard now keeps a log** of what it does: when a file arrived and how big it was, how long each step took, how many rows and findings, explanations generated, reports produced, files downloaded or deleted. That is what you need if something goes wrong on a real install.
+- **The log cannot contain client data.** It never records narrations, account names, amounts or the client's file name. This is enforced in one place, so it doesn't depend on remembering. A test runs a whole review and checks every log line for anything from the ledger. To make sure that test actually works, I planted a leak on purpose and confirmed it caught it.
+
+**Why it matters:** a CA at 11:30 pm should see progress, not a frozen screen. And a log is the easiest place for a privacy promise to break by accident.
+
+**Tests/checks:**
+- ruff ✅ · pyright 0 errors ✅ · **639 tests** ✅ (11 new) · TypeScript ✅ · web build ✅
+- benchmark identical ✅
+- 26 MB upload through the browser, watched stage by stage ✅
+
+**One deliberate difference from the plan:** a file that fails to analyse is still not kept, so "Nothing was saved" stays true. Retrying just re-sends the same file from your browser.
+
+**Founder decision needed:** none.
+
+**Next step:** Phase 6, the security and privacy review: browser security headers, a written threat model, and making sure no screen claims more privacy than is true (e.g. "Everything stays on this machine" on the hosted demo).
+

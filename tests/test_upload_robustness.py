@@ -244,5 +244,5 @@ def test_a_failure_log_never_contains_ledger_values(
         response = _upload(client, "books.csv", _csv(ledger, "utf-8"))
 
     assert response.status_code == 500
-    assert "analysis failed" in caplog.text
+    assert "analysis.failed" in caplog.text
     assert marker not in caplog.text

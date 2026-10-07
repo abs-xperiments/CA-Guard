@@ -198,6 +198,17 @@ export interface EngagementSummary {
   latest_file: string | null;
 }
 
+/** A background analysis, as the upload screen follows it. */
+export interface UploadJob {
+  id: string;
+  state: "queued" | "running" | "done" | "failed";
+  stage: string | null;
+  stages: { key: string; label: string; state: "done" | "current" | "pending" }[];
+  engagement_id: string | null;
+  error: string | null;
+  elapsed_seconds: number;
+}
+
 export interface User {
   id: string;
   email: string;

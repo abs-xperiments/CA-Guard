@@ -24,6 +24,7 @@ from caguard.api.workspace import Workspace
 from caguard.auth.users import User
 from caguard.intake.normalise import FIRST_DATA_ROW
 from caguard.intake.readers import IntakeError, read_table
+from caguard.observability import event
 from caguard.review.sources import SourceIntegrityError
 from caguard.review.store import SourceFile
 
@@ -72,14 +73,14 @@ def build_source_router(workspace: Workspace, signed_in: Any) -> APIRouter:
         except FileNotFoundError as exc:
             raise HTTPException(410, f"The stored copy of {source.filename} is missing.") from exc
         except SourceIntegrityError as exc:
-            logger.error("download refused: hash mismatch source_id=%s", source.id)
+            event(logger, "source.download_refused", logging.ERROR, source=source.id)
             raise HTTPException(
                 409,
                 f"The stored copy of {source.filename} no longer matches what was uploaded, "
                 "so it is not being sent. Upload the original again.",
             ) from exc
 
-        logger.info("original downloaded source_id=%s by=%s", source.id, user.id)
+        event(logger, "source.downloaded", source=source.id, user=user.id)
         return FileResponse(
             path,
             media_type=_MEDIA_TYPES.get(source.suffix, "application/octet-stream"),
@@ -136,7 +137,7 @@ def build_source_router(workspace: Workspace, signed_in: Any) -> APIRouter:
         if not workspace.store.sources(engagement_id):
             # Nothing left to analyse from; the next open says so plainly.
             workspace.forget(engagement_id)
-        logger.info("original deleted source_id=%s by=%s", source.id, user.id)
+        event(logger, "source.deleted", source=source.id, user=user.id)
         return SourceFileOut.build(updated, available=False)
 
     return router

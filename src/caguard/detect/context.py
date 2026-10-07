@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from collections import Counter
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pandas as pd
 
@@ -68,9 +68,16 @@ class LedgerContext:
     def __len__(self) -> int:
         return len(self.vouchers)
 
-    def rows(self) -> Iterator[tuple[str, pd.Series]]:
-        for voucher_id, row in self.vouchers.iterrows():
-            yield str(voucher_id), row
+    def rows(self) -> Iterator[tuple[str, Any]]:
+        """Each voucher id with its row, read by attribute (``row.amount_paise``).
+
+        Named tuples rather than ``iterrows``: every rule walks every voucher,
+        and building a pandas Series per row was the single largest cost of an
+        analysis (measured on a 30,000-voucher ledger). Attribute access is
+        identical, and the benchmark regenerates byte-for-byte.
+        """
+        for row in self.vouchers.itertuples(name="Voucher"):
+            yield str(row[0]), row  # row[0] is the index: the voucher id
 
 
 def build_context(lines: pd.DataFrame) -> LedgerContext:

@@ -290,7 +290,20 @@ Fixed along the way: workspace keyboard shortcuts now pause while any dialog is 
 - the report shows system finding vs reviewer decision separately, plus source hash and ruleset version, and prints cleanly to PDF;
 - demo mode isolates engagements per user (test).
 
-### Phase 5 — Async analysis and observability (B2 completion, E4, S8)
+### Phase 5 — Async analysis and observability (B2 completion, E4, S8) — ✅ done 2026-10-07 23:34 IST
+
+**How the criteria were met:**
+- **Background uploads:** `POST /api/uploads` returns a job at once; `GET /api/jobs/{id}` reports the stage (reading → mapping → analysing → keeping). The workspace shows real upload percentage, then the stages, then opens the review on its own (checked in a browser with a 26 MB ledger).
+  - Jobs run on a 2-worker pool and are visible only to the account that started them.
+  - The synchronous `POST /api/engagements` remains for the CLI and scripts; both share one pipeline.
+- **Logging:** `caguard.observability.event` accepts only numbers, flags and identifier-shaped strings, and redacts free text.
+  - A test runs the whole review path (upload, open, explain, decide, both reports, download, delete) and checks that no narration, account name, preparer, note or filename reaches the log. It was mutation-checked against a planted leak.
+  - Every stage is timed in `analysis.completed`.
+- **Measured, then fixed:** the live log showed analysis was 13.2 s of 13.7 s. A profile pinned it on `iterrows()` in `LedgerContext.rows()`; switching to `itertuples()` took a realistic 30,034-voucher ledger from about 11 s to 4.8 s. Findings are identical and the benchmark regenerates byte-for-byte.
+
+**Deviation from the original criterion:** "a failed analysis keeps the stored file and offers a retry". A failed file is still not kept, so "Nothing was saved" stays true (D-054). The retry instead re-sends the same file, which the browser still holds: one click, nothing stored that CA-Guard could not use.
+
+**Not done:** a downloadable list of the individual rows left out at intake. Counts and reasons are disclosed (unreadable dates; rows without a voucher number or date). Deferred as low value for now.
 **Acceptance:**
 - the upload returns immediately with a job ID;
 - the UI shows stages (reading → mapping → analysing → ranking) and the final row disclosure;

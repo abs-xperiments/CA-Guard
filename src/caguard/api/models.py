@@ -13,6 +13,7 @@ from datetime import datetime
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
 
+from caguard.api.jobs import STAGE_KEYS, STAGES, Job, JobState
 from caguard.explain.card import ExplanationCard
 from caguard.explain.vocabulary import contribution_level, is_minor
 from caguard.money import format_inr
@@ -388,6 +389,52 @@ class DecisionOut(BaseModel):
             adjusted_band=decision.adjusted_band,
             decided_at=decision.decided_at,
             sequence=decision.sequence,
+        )
+
+
+class JobStageOut(BaseModel):
+    key: str
+    label: str
+    state: str  # "done" | "current" | "pending"
+
+
+class JobOut(BaseModel):
+    """A background analysis, as the upload screen shows it."""
+
+    id: str
+    state: str
+    stage: str | None
+    stages: list[JobStageOut]
+    engagement_id: str | None
+    error: str | None
+    elapsed_seconds: float
+
+    @classmethod
+    def build(cls, job: Job) -> JobOut:
+        reached = STAGE_KEYS.index(job.stage) if job.stage in STAGE_KEYS else -1
+        finished = job.state is JobState.DONE
+        stages = [
+            JobStageOut(
+                key=key,
+                label=label,
+                state=(
+                    "done"
+                    if finished or index < reached
+                    else "current"
+                    if index == reached
+                    else "pending"
+                ),
+            )
+            for index, (key, label) in enumerate(STAGES)
+        ]
+        return cls(
+            id=job.id,
+            state=job.state.value,
+            stage=job.stage,
+            stages=stages,
+            engagement_id=job.engagement_id,
+            error=job.error,
+            elapsed_seconds=round(job.elapsed, 1),
         )
 
 
