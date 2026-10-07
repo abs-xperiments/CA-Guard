@@ -104,7 +104,19 @@ curl -s http://127.0.0.1:3000/api/health
 
 ## Public demo on Railway
 
-**Prepared, not deployed.** Everything below is ready; the steps are yours to run because they involve an account and a monthly charge.
+**Prepared and verified locally; not yet deployed** (2026-10-08 01:52 IST). Deploying needs the founder's Railway account (sign-in is interactive) and the Hobby plan. Once the CLI on this machine is signed in, the steps below are run by Claude.
+
+### The image, verified as Railway will run it
+
+| Check | Result |
+|---|---|
+| Dependencies | Installed from `uv.lock` with `uv sync --frozen`; no uv, compilers or caches in the final image |
+| Runtime user | uid 10001; the app code is read-only to it; only `/data` is writable |
+| Node | The exact version the workspace was built with (copied, not the distribution's package) |
+| Health | Checked *through* the workspace, so healthy means both processes serve |
+| A process dies | The container exits (verified by killing the engine: exit 137), so Railway's `ON_FAILURE` policy restarts it |
+| Restart with a volume | Account, engagement (rebuilt from its stored original) and decisions all survive |
+| Demo mode | An invite code under 16 characters stops start-up with a clear message; sign-up without the code is refused; API docs are hidden |
 
 ### What is already in place
 
@@ -134,6 +146,20 @@ Railway containers have ephemeral disks. **Without a volume mounted at `/data`, 
 ### Cost
 
 **Hobby, $5/month.** The free plan gives 1 vCPU and 0.5 GB of RAM; this stack will not run in that.
+
+### What Claude runs once the CLI is signed in
+
+```bash
+railway init --name ca-guard-demo            # the project
+railway up --detach                           # build the Dockerfile and deploy (railway.json)
+railway volume add --mount-path /data         # decisions and stored originals survive redeploys
+railway variable set CAGUARD_DEMO=1 CAGUARD_SECURE_COOKIES=1
+railway variable set CAGUARD_INVITE_CODE="$(python -c 'import secrets; print(secrets.token_urlsafe(18))')"
+railway domain                                # a public https://…up.railway.app address
+railway logs                                  # read, don't guess, if anything fails
+```
+
+The invite code is generated straight into Railway and never printed into this repository or the journal. To read it: `railway variables`, or the service's **Variables** tab in the Railway dashboard.
 
 ### After it is live
 

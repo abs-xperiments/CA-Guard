@@ -383,7 +383,13 @@ Both need a benchmark re-run before any change.
 - usable at tablet width;
 - no gratuitous animation.
 
-### Phase 9 — Deployment — *blocked on FD-1*
+### Phase 9 — Deployment — 🟡 prepared and verified locally (2026-10-08 01:52 IST); **blocked on the founder's Railway sign-in**
+
+**Done:**
+- the image hardened (lockfile install, read-only code, exact Node, fail-fast entrypoint);
+- built and verified locally as Railway will run it: functional, restart, crash and demo-mode checks (`docs/deploy.md`).
+
+**Waiting on the founder:** the Railway account, the Hobby plan, and `railway login` on this Mac.
 **Acceptance:**
 - the self-hosted Docker image is rebuilt and verified end to end;
 - the hosted demo is deployed per FD-1 with `CAGUARD_DEMO=1`, an invite code, a persistent volume and HTTPS-only cookies;
