@@ -28,7 +28,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from caguard.review.decisions import Decision, ReviewAction
 from caguard.review.engagement import Engagement
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);
@@ -86,6 +86,22 @@ CREATE TABLE IF NOT EXISTS source_files (
 CREATE INDEX IF NOT EXISTS source_files_by_engagement
     ON source_files (engagement_id, uploaded_at);
 """,
+    # v3: what the dashboard needs without re-analysing every ledger to draw a
+    # list — a name the reviewer chose, who opened it (for per-user isolation
+    # on the public demo), and the analysis outcome. Stats live in their own
+    # table: they describe a run, not the engagement's identity.
+    3: """
+ALTER TABLE engagements ADD COLUMN display_name TEXT;
+ALTER TABLE engagements ADD COLUMN owner_id TEXT;
+
+CREATE TABLE IF NOT EXISTS engagement_stats (
+    engagement_id   TEXT PRIMARY KEY REFERENCES engagements(id),
+    flagged         INTEGER NOT NULL,
+    high            INTEGER NOT NULL,
+    medium          INTEGER NOT NULL,
+    analysed_at     TEXT NOT NULL
+);
+""",
 }
 
 
@@ -138,7 +154,7 @@ class ReviewStore:
 
     # --- engagements ---------------------------------------------------------
 
-    def open_engagement(self, engagement: Engagement) -> Engagement:
+    def open_engagement(self, engagement: Engagement, *, owner_id: str = "") -> Engagement:
         """Record an engagement, or return the one already stored under this id."""
         existing = self.engagement(engagement.id)
         if existing is not None:
@@ -148,8 +164,8 @@ class ReviewStore:
             connection.execute(
                 """INSERT INTO engagements
                    (id, name, entity_id, fiscal_year, source_name,
-                    content_sha256, voucher_count, opened_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    content_sha256, voucher_count, opened_at, owner_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     engagement.id,
                     engagement.name,
@@ -159,9 +175,71 @@ class ReviewStore:
                     engagement.content_sha256,
                     engagement.voucher_count,
                     engagement.opened_at.isoformat(),
+                    owner_id or None,
                 ),
             )
         return engagement
+
+    def owner_of(self, engagement_id: str) -> str | None:
+        with (
+            self._connect() as connection,
+            closing(
+                connection.execute(
+                    "SELECT owner_id FROM engagements WHERE id = ?", (engagement_id,)
+                )
+            ) as cursor,
+        ):
+            row = cursor.fetchone()
+        return row["owner_id"] if row else None
+
+    def rename(self, engagement_id: str, display_name: str) -> None:
+        """The reviewer's own name for an engagement. Blank restores the derived one."""
+        with self._connect() as connection:
+            connection.execute(
+                "UPDATE engagements SET display_name = ? WHERE id = ?",
+                (display_name.strip() or None, engagement_id),
+            )
+
+    def record_stats(self, engagement_id: str, *, flagged: int, high: int, medium: int) -> None:
+        """What the latest analysis found. Deterministic, so re-recording is harmless."""
+        with self._connect() as connection:
+            connection.execute(
+                """INSERT INTO engagement_stats (engagement_id, flagged, high, medium, analysed_at)
+                   VALUES (?, ?, ?, ?, ?)
+                   ON CONFLICT(engagement_id) DO UPDATE SET
+                     flagged = excluded.flagged, high = excluded.high,
+                     medium = excluded.medium, analysed_at = excluded.analysed_at""",
+                (engagement_id, flagged, high, medium, datetime.now(UTC).isoformat()),
+            )
+
+    def summaries(self, owner_id: str | None = None) -> list[EngagementSummary]:
+        """Every engagement with its progress, most recently active first.
+
+        One query, so the dashboard costs the same whether a firm has three
+        engagements or three hundred. ``owner_id`` limits it to one person's —
+        used on the public demo, where visitors must not see each other's work.
+        """
+        query = """
+            SELECT e.*, s.flagged, s.high, s.medium,
+                   (SELECT COUNT(DISTINCT d.voucher_id) FROM decisions d
+                     WHERE d.engagement_id = e.id) AS reviewed,
+                   (SELECT MAX(d.decided_at) FROM decisions d
+                     WHERE d.engagement_id = e.id) AS last_decision,
+                   (SELECT f.filename FROM source_files f
+                     WHERE f.engagement_id = e.id AND f.deleted_at IS NULL
+                     ORDER BY f.uploaded_at DESC LIMIT 1) AS latest_file
+            FROM engagements e
+            LEFT JOIN engagement_stats s ON s.engagement_id = e.id
+        """
+        params: tuple[object, ...] = ()
+        if owner_id is not None:
+            query += " WHERE e.owner_id = ?"
+            params = (owner_id,)
+        with self._connect() as connection, closing(connection.execute(query, params)) as cursor:
+            rows = cursor.fetchall()
+
+        summaries = [_summary_from(row) for row in rows]
+        return sorted(summaries, key=lambda s: s.last_activity, reverse=True)
 
     def engagement(self, engagement_id: str) -> Engagement | None:
         with (
@@ -362,16 +440,46 @@ def _utc(text: str) -> datetime:
     return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
+class EngagementSummary(BaseModel):
+    """An engagement as the dashboard lists it."""
+
+    model_config = ConfigDict(frozen=True)
+
+    engagement: Engagement
+    flagged: int | None
+    high: int | None
+    medium: int | None
+    reviewed: int
+    last_activity: datetime
+    latest_file: str | None
+
+
+def _summary_from(row: sqlite3.Row) -> EngagementSummary:
+    engagement = _engagement_from(row)
+    activity = [engagement.opened_at]
+    if row["last_decision"]:
+        activity.append(_utc(row["last_decision"]))
+    return EngagementSummary(
+        engagement=engagement,
+        flagged=row["flagged"],
+        high=row["high"],
+        medium=row["medium"],
+        reviewed=int(row["reviewed"] or 0),
+        last_activity=max(activity),
+        latest_file=row["latest_file"],
+    )
+
+
 def _engagement_from(row: sqlite3.Row) -> Engagement:
     return Engagement(
         id=row["id"],
-        name=row["name"],
+        name=row["display_name"] or row["name"],
         entity_id=row["entity_id"],
         fiscal_year=row["fiscal_year"],
         source_name=row["source_name"],
         content_sha256=row["content_sha256"],
         voucher_count=row["voucher_count"],
-        opened_at=datetime.fromisoformat(row["opened_at"]),
+        opened_at=_utc(row["opened_at"]),
     )
 
 

@@ -12,13 +12,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { FileUp, FolderOpen, LogOut, ShieldCheck } from "lucide-react";
 import { ApiError, api, auth } from "@/lib/api";
-import type { Engagement, User } from "@/lib/types";
+import type { EngagementSummary, User } from "@/lib/types";
+import { whenIST } from "@/lib/types";
 import { Button, EmptyState, ErrorState, Spinner } from "@/components/ui";
 
 export default function Home() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [engagements, setEngagements] = useState<Engagement[] | null>(null);
+  const [engagements, setEngagements] = useState<EngagementSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [dragging, setDragging] = useState(false);
@@ -160,22 +161,21 @@ export default function Home() {
           />
         ) : (
           <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">
-            {engagements.map((engagement) => (
-              <li key={engagement.id}>
+            {engagements.map((row) => (
+              <li key={row.engagement.id}>
                 <button
-                  onClick={() => router.push(`/review/${engagement.id}`)}
-                  className="flex w-full items-center justify-between px-4 py-3 text-left transition-colors hover:bg-canvas"
+                  onClick={() => router.push(`/review/${row.engagement.id}`)}
+                  className="flex w-full items-center gap-6 px-4 py-3 text-left transition-colors hover:bg-canvas"
                 >
-                  <div>
-                    <p className="text-sm font-medium text-ink">{engagement.name}</p>
-                    <p className="text-[13px] text-ink-muted">
-                      {engagement.source_name} · {engagement.voucher_count.toLocaleString("en-IN")}{" "}
-                      vouchers
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-ink">{row.engagement.name}</p>
+                    <p className="truncate text-[13px] text-ink-muted">
+                      {row.latest_file ?? row.engagement.source_name} ·{" "}
+                      {row.engagement.voucher_count.toLocaleString("en-IN")} vouchers · last
+                      worked on {whenIST(row.last_activity)}
                     </p>
                   </div>
-                  <span className="font-mono text-[11px] text-ink-faint">
-                    {engagement.short_hash}
-                  </span>
+                  <Progress row={row} />
                 </button>
               </li>
             ))}
@@ -183,5 +183,31 @@ export default function Home() {
         )}
       </section>
     </main>
+  );
+}
+
+/** How far along a review is, at a glance: reviewed of flagged, and what is high. */
+function Progress({ row }: { row: EngagementSummary }) {
+  if (row.flagged === null) {
+    return <span className="text-[12px] text-ink-faint">Open to analyse</span>;
+  }
+  const done = row.flagged ? Math.min(row.reviewed / row.flagged, 1) : 1;
+  return (
+    <div className="w-44 shrink-0">
+      <div className="flex items-baseline justify-between text-[12px]">
+        <span className="tabular text-ink">
+          {row.reviewed.toLocaleString("en-IN")} of {row.flagged.toLocaleString("en-IN")} reviewed
+        </span>
+        {row.high ? (
+          <span className="tabular font-semibold text-high">{row.high} high</span>
+        ) : null}
+      </div>
+      <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-line">
+        <div
+          className={done >= 1 ? "h-full bg-rejected" : "h-full bg-accent"}
+          style={{ width: `${Math.max(done * 100, 2)}%` }}
+        />
+      </div>
+    </div>
   );
 }

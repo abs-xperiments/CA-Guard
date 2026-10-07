@@ -94,6 +94,8 @@ class Workspace:
     config: DetectorConfig = field(default_factory=DetectorConfig)
     model: str = "none"
     analyses: dict[str, Analysis] = field(default_factory=dict)
+    #: Public-demo mode: each account sees only the engagements it opened.
+    isolate_users: bool = False
     _reload_lock: threading.Lock = field(default_factory=threading.Lock)
 
     def explanation_service(self) -> ExplanationService:
@@ -121,8 +123,12 @@ class Workspace:
         intake: NormalisationReport | None = None,
         *,
         raw: pd.DataFrame | None = None,
+        owner_id: str = "",
     ) -> Analysis:
-        engagement = self.store.open_engagement(open_engagement(lines, source=source))
+        scope = owner_id if self.isolate_users else ""
+        engagement = self.store.open_engagement(
+            open_engagement(lines, source=source, scope=scope), owner_id=owner_id
+        )
         cached = self.analyses.get(engagement.id)
         if cached is not None:
             return cached
@@ -136,9 +142,36 @@ class Workspace:
             context=context,
         )
         self.analyses[engagement.id] = analysis
+        self._record_stats(analysis)
         return analysis
 
-    def ingest(self, path: Path, suffix: str, display_name: str, uploaded_by: str) -> Analysis:
+    def _record_stats(self, analysis: Analysis) -> None:
+        bands = [f.band.value for f in analysis.findings]
+        self.store.record_stats(
+            analysis.engagement.id,
+            flagged=len(bands),
+            high=bands.count("high"),
+            medium=bands.count("medium"),
+        )
+
+    def can_see(self, engagement_id: str, user_id: str) -> bool:
+        """Whether this account may open this engagement.
+
+        Self-hosted, every reviewer in the firm shares the workspace. On the
+        public demo, only the account that opened an engagement can see it.
+        """
+        if not self.isolate_users:
+            return True
+        return self.store.owner_of(engagement_id) == user_id
+
+    def ingest(
+        self,
+        path: Path,
+        suffix: str,
+        display_name: str,
+        uploaded_by: str,
+        owner_id: str = "",
+    ) -> Analysis:
         """Read, analyse and keep one uploaded file. Runs in a worker thread.
 
         The file is kept only once the analysis has succeeded, so a file
@@ -147,7 +180,11 @@ class Workspace:
         raw = _read(path, display_name)
         normalised = _normalise(raw, display_name)
         analysis = self.analyse(
-            normalised.lines, source=display_name, intake=normalised.report, raw=raw
+            normalised.lines,
+            source=display_name,
+            intake=normalised.report,
+            raw=raw,
+            owner_id=owner_id,
         )
 
         stored = self.vault.keep(path, suffix)
@@ -226,7 +263,7 @@ class Workspace:
                 continue
 
             context = build_context(normalised.lines)
-            return Analysis(
+            rebuilt = Analysis(
                 engagement,
                 normalised.lines,
                 build_findings(normalised.lines, self.config, context=context),
@@ -235,6 +272,8 @@ class Workspace:
                 source=source,
                 context=context,
             )
+            self._record_stats(rebuilt)
+            return rebuilt
 
         raise HTTPException(
             409,

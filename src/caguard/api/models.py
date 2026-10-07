@@ -19,7 +19,7 @@ from caguard.money import format_inr
 from caguard.review.decisions import Decision, ReviewAction
 from caguard.review.engagement import Engagement
 from caguard.review.finding import Finding, RiskBand
-from caguard.review.store import SourceFile
+from caguard.review.store import EngagementSummary, SourceFile
 
 
 class SignalOut(BaseModel):
@@ -207,6 +207,10 @@ class FindingOut(BaseModel):
     source: SourceRefOut | None = None
     #: The structured explanation. Single finding only, like ``lines``.
     card: ExplanationCard | None = None
+    #: For searching the queue: the voucher's account names and narration.
+    accounts: list[str] = Field(default_factory=list)
+    narration: str | None = None
+    prepared_by: str | None = None
 
     @classmethod
     def build(
@@ -217,7 +221,14 @@ class FindingOut(BaseModel):
         lines: pd.DataFrame | None = None,
         source: SourceFile | None = None,
         card: ExplanationCard | None = None,
+        accounts: list[str] | None = None,
+        narration: str | None = None,
+        prepared_by: str | None = None,
+        signal_evidence: bool = True,
     ) -> FindingOut:
+        """``signal_evidence=False`` for queue rows: the table never shows each
+        signal's evidence dictionary, and at ~1 KB a row it was most of the
+        queue's weight. The single-finding view still carries it."""
         return cls(
             voucher_id=finding.voucher_id,
             voucher_date=finding.voucher_date,
@@ -234,7 +245,7 @@ class FindingOut(BaseModel):
                     contribution=round(finding.contributions.get(hit.kind, 0.0), 4),
                     level=contribution_level(finding.contributions.get(hit.kind, 0.0)),
                     minor=is_minor(finding.contributions.get(hit.kind, 0.0)),
-                    evidence=dict(hit.evidence),
+                    evidence=dict(hit.evidence) if signal_evidence else {},
                 )
                 for hit in sorted(
                     finding.signals,
@@ -257,6 +268,9 @@ class FindingOut(BaseModel):
             lines=LineOut.from_frame(lines) if lines is not None else [],
             source=SourceRefOut(id=source.id, filename=source.filename) if source else None,
             card=card,
+            accounts=accounts or [],
+            narration=narration,
+            prepared_by=prepared_by,
         )
 
 
@@ -282,6 +296,36 @@ class EngagementOut(BaseModel):
             short_hash=engagement.short_hash,
             opened_at=engagement.opened_at,
         )
+
+
+class EngagementSummaryOut(BaseModel):
+    """One row on the dashboard: what the engagement is and how far along it is."""
+
+    engagement: EngagementOut
+    flagged: int | None
+    high: int | None
+    medium: int | None
+    reviewed: int
+    last_activity: datetime
+    latest_file: str | None
+
+    @classmethod
+    def build(cls, summary: EngagementSummary) -> EngagementSummaryOut:
+        return cls(
+            engagement=EngagementOut.build(summary.engagement),
+            flagged=summary.flagged,
+            high=summary.high,
+            medium=summary.medium,
+            reviewed=summary.reviewed,
+            last_activity=summary.last_activity,
+            latest_file=summary.latest_file,
+        )
+
+
+class RenameIn(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(max_length=120)
 
 
 class IntakeReportOut(BaseModel):

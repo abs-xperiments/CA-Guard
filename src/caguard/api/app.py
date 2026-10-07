@@ -22,7 +22,7 @@ import tempfile
 from pathlib import Path
 
 import pandas as pd
-from fastapi import Depends, FastAPI, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
@@ -31,10 +31,12 @@ from caguard.api.models import (
     DecisionIn,
     DecisionOut,
     EngagementOut,
+    EngagementSummaryOut,
     ExplanationOut,
     FindingOut,
     IntakeReportOut,
     QueueOut,
+    RenameIn,
 )
 from caguard.api.source_routes import build_source_router
 from caguard.api.workspace import Analysis, Workspace
@@ -71,7 +73,9 @@ def create_app(
 ) -> FastAPI:
     """Build the application. Nothing is analysed until a ledger is uploaded."""
     data_dir = Path(store_path).parent
+    demo = demo_mode()
     workspace = Workspace(
+        isolate_users=demo,
         store=ReviewStore(store_path),
         vault=SourceVault(data_dir / "sources"),
         config=config or DetectorConfig(),
@@ -93,7 +97,16 @@ def create_app(
     # a signed-in user. Applied as a dependency rather than remembered per route,
     # because a route someone forgets to protect is the one that leaks.
     signed_in = Depends(current_user_dependency(users, signing_key))
-    app.include_router(build_source_router(workspace, signed_in))
+
+    def can_open(engagement_id: str, user: User = signed_in) -> None:
+        # The same answer for "not yours" and "does not exist": on the demo, an
+        # engagement id must not confirm that someone else's work exists.
+        if not workspace.can_see(engagement_id, user.id):
+            raise HTTPException(404, "There is no such engagement.")
+
+    # Every route under one engagement goes through this router, so the access
+    # check is applied once, not remembered route by route.
+    scoped = APIRouter(dependencies=[Depends(can_open)])
 
     @app.get("/api/health")
     def health() -> dict[str, object]:
@@ -105,12 +118,26 @@ def create_app(
             # is a demonstration on synthetic data. The privacy claim belongs to
             # the self-hosted path, and wording that blurs the two would mislead
             # a CA about where their client's ledger sits (D-005).
-            "demo_mode": os.environ.get("CAGUARD_DEMO", "").strip().lower() in {"1", "true", "yes"},
+            "demo_mode": demo,
         }
 
-    @app.get("/api/engagements", response_model=list[EngagementOut])
-    def list_engagements(user: User = signed_in) -> list[EngagementOut]:
-        return [EngagementOut.build(e) for e in workspace.store.engagements()]
+    @app.get("/api/engagements", response_model=list[EngagementSummaryOut])
+    def list_engagements(user: User = signed_in) -> list[EngagementSummaryOut]:
+        owner = user.id if workspace.isolate_users else None
+        return [EngagementSummaryOut.build(s) for s in workspace.store.summaries(owner)]
+
+    @scoped.patch("/api/engagements/{engagement_id}", response_model=EngagementOut)
+    def rename(engagement_id: str, body: RenameIn, user: User = signed_in) -> EngagementOut:
+        """Give an engagement a name the firm recognises, e.g. "Sharma Traders — FY25"."""
+        if workspace.store.engagement(engagement_id) is None:
+            raise HTTPException(404, "There is no such engagement.")
+        workspace.store.rename(engagement_id, body.name)
+        renamed = workspace.store.engagement(engagement_id)
+        assert renamed is not None
+        analysis = workspace.analyses.get(engagement_id)
+        if analysis is not None:
+            analysis.engagement = renamed
+        return EngagementOut.build(renamed)
 
     @app.post("/api/engagements", response_model=QueueOut)
     async def upload(file: UploadFile, user: User = signed_in) -> QueueOut:
@@ -133,18 +160,16 @@ def create_app(
             # year's ledger. Run on the event loop, they froze the whole server
             # for every user until they finished (measured: 12 s for a health
             # check during a 13.5 s analysis).
-            analysis = await run_in_threadpool(
-                _ingest, workspace, temp, suffix, display_name, user.display_name
-            )
+            analysis = await run_in_threadpool(_ingest, workspace, temp, suffix, display_name, user)
         finally:
             temp.unlink(missing_ok=True)
         return _queue(workspace, analysis)
 
-    @app.get("/api/engagements/{engagement_id}/queue", response_model=QueueOut)
+    @scoped.get("/api/engagements/{engagement_id}/queue", response_model=QueueOut)
     def queue(engagement_id: str, user: User = signed_in) -> QueueOut:
         return _queue(workspace, workspace.require(engagement_id))
 
-    @app.get(
+    @scoped.get(
         "/api/engagements/{engagement_id}/findings/{voucher_id}",
         response_model=FindingOut,
     )
@@ -174,7 +199,7 @@ def create_app(
             card=card,
         )
 
-    @app.get(
+    @scoped.get(
         "/api/engagements/{engagement_id}/findings/{voucher_id}/explanation",
         response_model=ExplanationOut,
     )
@@ -195,7 +220,7 @@ def create_app(
             provenance=result.provenance(),
         )
 
-    @app.post("/api/engagements/{engagement_id}/decisions", response_model=DecisionOut)
+    @scoped.post("/api/engagements/{engagement_id}/decisions", response_model=DecisionOut)
     def decide(engagement_id: str, body: DecisionIn, user: User = signed_in) -> DecisionOut:
         analysis = workspace.require(engagement_id)
         if body.voucher_id not in analysis.by_voucher:
@@ -216,14 +241,14 @@ def create_app(
             raise HTTPException(422, str(exc)) from exc
         return DecisionOut.build(workspace.store.record(decision))
 
-    @app.get("/api/engagements/{engagement_id}/trail", response_model=list[DecisionOut])
+    @scoped.get("/api/engagements/{engagement_id}/trail", response_model=list[DecisionOut])
     def trail(
         engagement_id: str, voucher_id: str | None = None, user: User = signed_in
     ) -> list[DecisionOut]:
         """The full audit trail, oldest first. Nothing is ever removed from it."""
         return [DecisionOut.build(d) for d in workspace.store.trail(engagement_id, voucher_id)]
 
-    @app.get("/api/engagements/{engagement_id}/report.csv")
+    @scoped.get("/api/engagements/{engagement_id}/report.csv")
     def report_csv(engagement_id: str, user: User = signed_in) -> PlainTextResponse:
         analysis = workspace.require(engagement_id)
         rows = build_rows(analysis.findings, workspace.store.current(engagement_id))
@@ -235,13 +260,32 @@ def create_app(
             },
         )
 
-    @app.get("/api/engagements/{engagement_id}/report.html")
+    @scoped.get("/api/engagements/{engagement_id}/report.html")
     def report_html(engagement_id: str, user: User = signed_in) -> HTMLResponse:
         analysis = workspace.require(engagement_id)
         rows = build_rows(analysis.findings, workspace.store.current(engagement_id))
-        return HTMLResponse(to_html(analysis.engagement, rows))
+        return HTMLResponse(
+            to_html(
+                analysis.engagement,
+                rows,
+                generated_by=user.display_name,
+                sources=workspace.store.sources(engagement_id, include_deleted=True),
+            ),
+            headers={"Cache-Control": "no-store"},
+        )
 
+    app.include_router(scoped)
+    app.include_router(build_source_router(workspace, signed_in), dependencies=[Depends(can_open)])
     return app
+
+
+def _text_or_none(value: object) -> str | None:
+    return value.strip() or None if isinstance(value, str) else None
+
+
+def demo_mode() -> bool:
+    """Set on a hosted deployment (D-005, D-052): banner on, users isolated."""
+    return os.environ.get("CAGUARD_DEMO", "").strip().lower() in {"1", "true", "yes"}
 
 
 async def _receive(file: UploadFile, directory: Path, suffix: str, display_name: str) -> Path:
@@ -274,7 +318,7 @@ async def _receive(file: UploadFile, directory: Path, suffix: str, display_name:
 
 
 def _ingest(
-    workspace: Workspace, path: Path, suffix: str, display_name: str, uploaded_by: str
+    workspace: Workspace, path: Path, suffix: str, display_name: str, user: User
 ) -> Analysis:
     """Analyse and keep one upload, turning any failure into a message to act on.
 
@@ -284,7 +328,9 @@ def _ingest(
     rather than showing an internal exception.
     """
     try:
-        return workspace.ingest(path, suffix, display_name, uploaded_by)
+        return workspace.ingest(
+            path, suffix, display_name, uploaded_by=user.display_name, owner_id=user.id
+        )
     except HTTPException:
         raise
     except Exception as exc:
@@ -302,7 +348,26 @@ def _ingest(
 
 def _queue(workspace: Workspace, analysis: Analysis) -> QueueOut:
     decisions = workspace.store.current(analysis.engagement.id)
-    findings = [FindingOut.build(f, decisions.get(f.voucher_id)) for f in analysis.findings]
+    vouchers = analysis.context.vouchers if analysis.context is not None else None
+    findings = []
+    for f in analysis.findings:
+        accounts: list[str] = []
+        narration: str | None = None
+        prepared_by: str | None = None
+        if vouchers is not None and f.voucher_id in vouchers.index:
+            accounts = [str(name) for name in vouchers.at[f.voucher_id, "account_names"]]
+            narration = _text_or_none(vouchers.at[f.voucher_id, "narration"])
+            prepared_by = _text_or_none(vouchers.at[f.voucher_id, "created_by"])
+        findings.append(
+            FindingOut.build(
+                f,
+                decisions.get(f.voucher_id),
+                accounts=accounts,
+                narration=narration,
+                prepared_by=prepared_by,
+                signal_evidence=False,
+            )
+        )
 
     bands = {band.value: sum(1 for f in analysis.findings if f.band is band) for band in RiskBand}
     states = {

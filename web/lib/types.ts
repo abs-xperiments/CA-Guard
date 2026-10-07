@@ -4,6 +4,27 @@ export type RiskBand = "high" | "medium" | "low";
 
 export type ReviewAction = "accept" | "reject" | "investigate" | "adjust";
 
+/**
+ * What each decision is called on screen (D-055). The stored values are
+ * unchanged; only the words are. "Accept" read to an accountant as "the entry
+ * is fine" — the opposite of what it meant — so the label now says what the
+ * reviewer concluded.
+ */
+export const DECISION_LABELS: Record<ReviewAction, { button: string; status: string; done: string }> = {
+  accept: {
+    button: "Exception — follow up",
+    status: "Exception",
+    done: "Recorded as an exception to follow up",
+  },
+  reject: {
+    button: "Cleared — not a concern",
+    status: "Cleared",
+    done: "Recorded as cleared",
+  },
+  investigate: { button: "Investigate", status: "Investigating", done: "Marked for investigation" },
+  adjust: { button: "Re-band", status: "Re-banded", done: "Re-banded" },
+};
+
 export interface Signal {
   kind: string;
   reason: string;
@@ -96,6 +117,10 @@ export interface Finding {
   source: SourceRef | null;
   /** The structured explanation. Present on a single finding only. */
   card: ExplanationCard | null;
+  /** For searching the queue. */
+  accounts: string[];
+  narration: string | null;
+  prepared_by: string | null;
 }
 
 /** One ledger line behind a finding, and where it sits in the uploaded file. */
@@ -159,6 +184,18 @@ export interface Engagement {
   voucher_count: number;
   short_hash: string;
   opened_at: string;
+}
+
+/** A dashboard row: the engagement and how far its review has got. */
+export interface EngagementSummary {
+  engagement: Engagement;
+  /** Null until the ledger has been analysed under this version. */
+  flagged: number | null;
+  high: number | null;
+  medium: number | null;
+  reviewed: number;
+  last_activity: string;
+  latest_file: string | null;
 }
 
 export interface User {

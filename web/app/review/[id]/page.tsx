@@ -15,16 +15,25 @@
  * reason.
  */
 
-import { use, useCallback, useEffect, useMemo, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, FileSpreadsheet, Inbox, LogOut, ShieldCheck } from "lucide-react";
+import {
+  ArrowLeft,
+  Download,
+  FileSpreadsheet,
+  Inbox,
+  LogOut,
+  ShieldCheck,
+} from "lucide-react";
 import { ApiError, api, auth } from "@/lib/api";
 import type { Decision, Finding, Queue, RiskBand, User } from "@/lib/types";
 import { EvidenceDrawer } from "@/components/EvidenceDrawer";
 import { FindingsTable } from "@/components/FindingsTable";
 import { IntakeNotice } from "@/components/IntakeNotice";
 import { QueueSkeleton } from "@/components/Skeleton";
+import { EngagementTitle } from "@/components/EngagementTitle";
+import { Filters, NarrowingControls, matcher } from "@/components/QueueControls";
 import { SourcesPanel } from "@/components/SourcesPanel";
 import { useToast } from "@/components/Toast";
 import { Button, EmptyState, ErrorState, Key, Stat, cx, shortcutBlocked } from "@/components/ui";
@@ -51,6 +60,13 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
   //: visibly acknowledged before the row leaves.
   const [settling, setSettling] = useState<Set<string>>(new Set());
   const [showSources, setShowSources] = useState(false);
+  const [search, setSearch] = useState("");
+  const [concern, setConcern] = useState("all");
+  const [onlyUndocumented, setOnlyUndocumented] = useState(false);
+  // Rows rendered so far. A ranked queue is worked from the top, so drawing the
+  // first page and adding more on request keeps a 2,000-finding ledger fast.
+  const [shown, setShown] = useState(PAGE_SIZE);
+  const searchBox = useRef<HTMLInputElement>(null);
   // 409: the engagement exists but cannot be rebuilt (its file was deleted, or
   // it predates stored originals). Retrying cannot help; re-uploading can.
   const [needsLedger, setNeedsLedger] = useState(false);
@@ -94,14 +110,41 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
 
   const visible = useMemo(() => {
     if (!queue) return [];
+    const match = matcher(search);
     return queue.findings.filter((finding) => {
       if (band !== "all" && finding.band !== band) return false;
+      if (concern !== "all" && !finding.concerns.includes(concern)) return false;
+      if (onlyUndocumented && finding.evidence.has_document) return false;
+      if (!match(finding)) return false;
       const open = finding.status === "not yet reviewed";
       if (status === "open" && !open && !settling.has(finding.voucher_id)) return false;
       if (status === "reviewed" && open) return false;
       return true;
     });
-  }, [queue, band, status, settling]);
+  }, [queue, band, status, settling, search, concern, onlyUndocumented]);
+
+  // Any narrowing beyond "not reviewed" means an empty list says nothing about
+  // whether the review is finished.
+  const narrowed = band !== "all" || concern !== "all" || onlyUndocumented || search.trim() !== "";
+
+  useEffect(() => {
+    setShown(PAGE_SIZE);
+  }, [band, status, search, concern, onlyUndocumented]);
+
+  const concernCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const finding of queue?.findings ?? []) {
+      for (const kind of finding.concerns) counts.set(kind, (counts.get(kind) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  }, [queue]);
+
+  const clearFilters = useCallback(() => {
+    setBand("all");
+    setConcern("all");
+    setOnlyUndocumented(false);
+    setSearch("");
+  }, []);
 
   const reviewed = useMemo(
     () => (queue ? queue.findings.filter((f) => f.status !== "not yet reviewed").length : 0),
@@ -116,6 +159,11 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
   useEffect(() => {
     setCursor((previous) => Math.min(previous, Math.max(visible.length - 1, 0)));
   }, [visible.length]);
+
+  // Moving past the last drawn row with the keyboard draws the next page.
+  useEffect(() => {
+    if (cursor >= shown - 1) setShown((previous) => previous + PAGE_SIZE);
+  }, [cursor, shown]);
 
   const applyDecision = useCallback((decision: Decision) => {
     setQueue((previous) =>
@@ -166,7 +214,10 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
     function onKey(event: KeyboardEvent) {
       if (shortcutBlocked(event)) return;
 
-      if (event.key === "Escape") {
+      if (event.key === "/") {
+        event.preventDefault();
+        searchBox.current?.focus();
+      } else if (event.key === "Escape") {
         setSelected(null);
       } else if (event.key === "j" || event.key === "ArrowDown") {
         event.preventDefault();
@@ -246,9 +297,13 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
           </Link>
 
           <div className="min-w-0">
-            <h1 className="truncate text-sm font-semibold text-ink">
-              {queue.engagement.name}
-            </h1>
+            <EngagementTitle
+              name={queue.engagement.name}
+              onRename={async (name) => {
+                const renamed = await api.rename(id, name);
+                setQueue((previous) => (previous ? { ...previous, engagement: renamed } : previous));
+              }}
+            />
             <p className="truncate text-[12px] text-ink-muted">
               {queue.engagement.source_name} ·{" "}
               {queue.total_vouchers.toLocaleString("en-IN")} vouchers ·{" "}
@@ -326,6 +381,16 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
               ]}
               onChange={(value) => setStatus(value as StatusFilter)}
             />
+            <NarrowingControls
+              concern={concern}
+              concernCounts={concernCounts}
+              onConcern={setConcern}
+              onlyUndocumented={onlyUndocumented}
+              onToggleUndocumented={() => setOnlyUndocumented((value) => !value)}
+              search={search}
+              onSearch={setSearch}
+              searchBox={searchBox}
+            />
 
             <div className="ml-auto flex items-center gap-1 text-[11px] text-ink-faint">
               <Key>j</Key>
@@ -333,7 +398,7 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
               <span>move</span>
               <Key>↵</Key>
               <span>open</span>
-              <Key>a</Key>
+              <Key>e</Key>
               <Key>i</Key>
               <span>decide</span>
             </div>
@@ -345,21 +410,27 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
               <EmptyState
                 icon={<Inbox size={22} />}
                 title={
-                  allDone
-                    ? "Every finding has been reviewed"
-                    : status === "open"
-                      ? "Nothing left to review"
-                      : "No findings match these filters"
+                  narrowed
+                    ? "No findings match"
+                    : allDone
+                      ? "Every finding has been reviewed"
+                      : status === "open"
+                        ? "Nothing left to review"
+                        : "No findings match these filters"
                 }
                 detail={
-                  allDone
-                    ? `All ${queue.flagged} findings carry a recorded decision. Open the report to see them together.`
-                    : status === "open"
-                      ? "Every finding has a recorded decision."
-                      : "Widen the risk or status filter to see more."
+                  narrowed
+                    ? "Nothing matches the search or filters. Clear them to see the rest of the queue."
+                    : allDone
+                      ? `All ${queue.flagged} findings carry a recorded decision. Open the report to see them together.`
+                      : status === "open"
+                        ? "Every finding has a recorded decision."
+                        : "Widen the risk or status filter to see more."
                 }
                 action={
-                  allDone ? (
+                  narrowed ? (
+                    <Button onClick={clearFilters}>Clear search and filters</Button>
+                  ) : allDone ? (
                     <a href={api.reportUrl(id, "html")} target="_blank" rel="noreferrer">
                       <Button variant="primary">
                         <Download size={14} /> Open the report
@@ -369,14 +440,27 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
                 }
               />
             ) : (
+              <>
               <FindingsTable
-                findings={visible}
+                findings={visible.slice(0, shown)}
                 selected={selected}
                 cursor={cursor}
                 settling={settling}
                 onSelect={setSelected}
                 onCursorChange={setCursor}
               />
+              {visible.length > shown ? (
+                <div className="mt-3 flex items-center justify-center gap-3 text-[12px] text-ink-muted">
+                  <span className="tabular">
+                    Showing {shown.toLocaleString("en-IN")} of{" "}
+                    {visible.length.toLocaleString("en-IN")}, highest priority first
+                  </span>
+                  <Button onClick={() => setShown((previous) => previous + PAGE_SIZE)}>
+                    Show {Math.min(PAGE_SIZE, visible.length - shown).toLocaleString("en-IN")} more
+                  </Button>
+                </div>
+              ) : null}
+              </>
             )}
           </div>
         </section>
@@ -404,36 +488,4 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
   );
 }
 
-function Filters({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: Array<[string, string]>;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-[11px] uppercase tracking-wide text-ink-faint">{label}</span>
-      <div className="flex overflow-hidden rounded-md ring-1 ring-inset ring-line">
-        {options.map(([key, text]) => (
-          <button
-            key={key}
-            onClick={() => onChange(key)}
-            className={cx(
-              "px-2.5 py-1 text-[12px] font-medium transition-colors",
-              value === key
-                ? "bg-accent text-white"
-                : "bg-surface text-ink-muted hover:bg-canvas",
-            )}
-          >
-            {text}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
+const PAGE_SIZE = 200;

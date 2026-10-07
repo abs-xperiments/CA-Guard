@@ -116,6 +116,7 @@ curl -s http://127.0.0.1:3000/api/health
 | Authentication | Every ledger route requires a signed-in account |
 | **Bootstrap protection** | With `CAGUARD_INVITE_CODE` set, even the *first* account needs it — closing the window between going live and you signing up |
 | **Demo banner** | With `CAGUARD_DEMO=1`, every page says it is a demonstration on synthetic data |
+| **Visitor isolation** | With `CAGUARD_DEMO=1`, each account sees only its own engagements, even when two visitors upload the same sample file (D-060) |
 
 ### The settings you must add
 

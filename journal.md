@@ -651,7 +651,7 @@ Before changing anything, I re-read the whole project. Then I actually *used* it
 
 ---
 
-## 2026-10-07 21:25 IST — [DECIDED] Your three answers are recorded.
+## 2026-10-07 21:14 IST — [DECIDED] Your three answers are recorded.
 
 - **Hosting: Railway only.** No Netlify. I'll ask for the Railway account step when we reach deployment (Phase 9). Nothing is being spent before then.
 - **Uploaded files: kept until someone deletes the engagement**, both on a firm's own machine and on the demo. A firm's retention policy (seven years under the audit documentation rules) stays the firm's call.
@@ -661,7 +661,7 @@ Before changing anything, I re-read the whole project. Then I actually *used* it
 
 ---
 
-## 2026-10-07 21:55 IST — [PHASE 1 of completion] The critical fixes. Every one was checked through the real screen, not just the engine.
+## 2026-10-07 21:29 IST — [PHASE 1 of completion] The critical fixes. Every one was checked through the real screen, not just the engine.
 
 **What happened:** the seven problems from the audit that would have hit a CA first are fixed.
 1. **Large ledgers upload.** A 27 MB, 116,000-row ledger now goes through the actual workspace in about 15 seconds. Before, anything over 10 MB failed after 30 seconds.
@@ -692,7 +692,7 @@ Before changing anything, I re-read the whole project. Then I actually *used* it
 
 ---
 
-## 2026-10-07 22:50 IST — [PHASE 2 of completion] Your uploaded files are kept, downloadable, and every finding points at its row.
+## 2026-10-07 21:47 IST — [PHASE 2 of completion] Your uploaded files are kept, downloadable, and every finding points at its row.
 
 **What happened:**
 - **"Where did my ledger go?" is answered.** Every engagement has a **Source** button. It lists each file uploaded to it: name, type, size, who uploaded it and when, how many rows were used, and a fingerprint.
@@ -725,7 +725,7 @@ Before changing anything, I re-read the whole project. Then I actually *used* it
 
 ---
 
-## 2026-10-08 00:40 IST — [PHASE 3 of completion] "Explain this finding" now answers what a CA asks. And I found a serious date bug.
+## 2026-10-07 22:29 IST — [PHASE 3 of completion] "Explain this finding" now answers what a CA asks. And I found a serious date bug.
 
 **What happened:** opening a finding now shows a full explanation, in the order a reviewer thinks:
 
@@ -763,3 +763,38 @@ Before changing anything, I re-read the whole project. Then I actually *used* it
 **Founder decision needed:** none.
 
 **Next step:** Phase 4, the review workflow. The new button wording you chose, a better dashboard, search, and a report that clearly separates what CA-Guard found from what the reviewer decided.
+
+---
+
+## 2026-10-07 22:47 IST — [PHASE 4 of completion] Your button wording, a real dashboard, search, and a report that separates CA-Guard from the reviewer.
+
+**What happened:**
+- **Your wording is in.** The buttons say **Exception — follow up**, **Cleared — not a concern** and **Investigate**, and so do the table, the pop-up messages and the report. The keyboard shortcut is now **e** for Exception. Decisions you'd already recorded keep their meaning.
+- **The home page shows where each review stands:** its name, the latest file, how many of the flagged entries have been reviewed (with a progress bar), how many are high priority, and when it was last worked on.
+- **You can rename an engagement.** Click its title and type, e.g. "Sharma Traders — FY 2024-25".
+- **Search and filters in the queue.**
+  - Type a voucher number, an amount in any format ("185530" or "1,85,530"), an account, words from the narration, or the preparer's name. Press **/** to jump to the search box.
+  - Filter by reason, or show only entries with no document.
+  - Large queues show 200 rows at a time, highest priority first.
+- **The report now reads like a working paper.**
+  - "What CA-Guard observed" and "What the reviewer decided" are visibly separate.
+  - It records which file it was built from, with a fingerprint that proves it.
+  - It says how the entries were picked: risk-based, not statistical sampling.
+  - It names who generated it and when, and dates every decision.
+  - It prints cleanly.
+- **On the public demo, visitors can't see each other's work**, even if two people upload the same sample file. I checked all 12 ways into an engagement. I also broke the protection on purpose to confirm the test catches it.
+
+**Bugs found and fixed:**
+- The report's summary line would have said "investigate**ed**".
+- If you filtered to high-priority items and had finished those, the screen said "Every finding has a recorded decision" even though others were still open. That could have made someone stop early.
+
+**A correction to this journal:** the times on my previous three entries were estimates, and they were wrong by up to two hours (one even said tomorrow). I've corrected them to the real commit times. From now on every time here is read from the clock.
+
+**Tests/checks:**
+- ruff ✅ · pyright 0 errors ✅ · **628 tests** ✅ (9 new) · TypeScript ✅ · web build ✅
+- dashboard, rename and search checked in a browser ✅
+
+**Founder decision needed:** none.
+
+**Next step:** Phase 5. Uploads become a background job with a visible progress indicator (reading → mapping → analysing → ranking), because a full year's ledger takes about 11 seconds to analyse and the screen shouldn't just sit there. Logging will cover every step without ever recording client data.
+

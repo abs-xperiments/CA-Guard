@@ -68,15 +68,24 @@ def open_engagement(
     *,
     name: str | None = None,
     source: str | Path = "uploaded ledger",
+    scope: str = "",
 ) -> Engagement:
-    """Build an engagement from a ledger, deriving what it can from the data."""
+    """Build an engagement from a ledger, deriving what it can from the data.
+
+    ``scope`` keeps engagements apart that would otherwise share an id. On the
+    public demo it is the visitor's account, so two people uploading the same
+    sample ledger get two engagements and never see each other's decisions.
+    Self-hosted, it is empty: the same book is the same engagement for the
+    whole firm, which is what a shared practice workspace wants.
+    """
     digest = ledger_hash(lines)
+    identity = digest if not scope else hashlib.sha256(f"{scope}:{digest}".encode()).hexdigest()
     entity = _first(lines, "entity_id")
     fiscal_year = _first(lines, "fiscal_year")
     source_name = Path(source).name if isinstance(source, Path) else str(source)
 
     return Engagement(
-        id=digest[:16],
+        id=identity[:16],
         name=name or f"{entity or 'Ledger'} {fiscal_year}".strip(),
         entity_id=entity,
         fiscal_year=fiscal_year,

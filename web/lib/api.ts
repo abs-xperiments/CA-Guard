@@ -8,6 +8,7 @@
 import type {
   Decision,
   Engagement,
+  EngagementSummary,
   Explanation,
   Finding,
   Queue,
@@ -81,7 +82,14 @@ export const api = {
   health: () =>
     request<{ status: string; model: string; model_available: boolean }>("/api/health"),
 
-  engagements: () => request<Engagement[]>("/api/engagements"),
+  engagements: () => request<EngagementSummary[]>("/api/engagements"),
+
+  rename: (id: string, name: string) =>
+    request<Engagement>(`/api/engagements/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name }),
+    }),
 
   upload: (file: File) => {
     const body = new FormData();

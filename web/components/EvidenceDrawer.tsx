@@ -27,7 +27,7 @@ import {
 } from "lucide-react";
 import { ApiError, api } from "@/lib/api";
 import type { Decision, Explanation, Finding, ReviewAction } from "@/lib/types";
-import { concernLabel, ukDate } from "@/lib/types";
+import { DECISION_LABELS, concernLabel, ukDate } from "@/lib/types";
 import {
   CardPlaceholder,
   CardSummary,
@@ -43,12 +43,9 @@ import { SourcePreview } from "./SourcePreview";
 import { useToast } from "./Toast";
 import { BandBadge, Button, EvidenceMeter, Key, StatusLabel, cx, shortcutBlocked } from "./ui";
 
-const ACTION_WORDS: Record<ReviewAction, string> = {
-  accept: "Accepted",
-  reject: "Rejected",
-  investigate: "Marked for investigation",
-  adjust: "Re-banded",
-};
+const ACTION_WORDS: Record<ReviewAction, string> = Object.fromEntries(
+  Object.entries(DECISION_LABELS).map(([action, label]) => [action, label.done]),
+) as Record<ReviewAction, string>;
 
 interface Props {
   engagementId: string;
@@ -125,7 +122,7 @@ export function EvidenceDrawer({
             action === "accept"
               ? "It will appear in the report as an exception to follow up."
               : action === "reject"
-                ? "Recorded as reviewed and not a concern."
+                ? "It will appear in the report as reviewed and cleared, with your reason."
                 : "Kept open for further work.",
           action: {
             label: "Undo",
@@ -170,9 +167,9 @@ export function EvidenceDrawer({
     function onKey(event: KeyboardEvent) {
       if (shortcutBlocked(event)) return;
 
-      if (event.key === "a") void decide("accept");
+      if (event.key === "e") void decide("accept");
       else if (event.key === "i") void decide("investigate");
-      // Reject is not a bare keystroke: it needs a typed reason.
+      // Clearing is not a bare keystroke: it needs a typed reason.
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -405,7 +402,7 @@ export function EvidenceDrawer({
             value={note}
             onChange={(event) => setNote(event.target.value)}
             rows={2}
-            placeholder="Required when rejecting — what did you check?"
+            placeholder="Required when clearing — what did you check?"
             className="mt-1 w-full resize-none rounded-md border border-line bg-surface px-3 py-2 text-[13px] text-ink placeholder:text-ink-faint focus:border-accent focus:outline-none"
           />
         </label>
@@ -413,17 +410,17 @@ export function EvidenceDrawer({
         <div className="mt-3 flex items-center gap-2">
           <DecisionButton
             action="accept"
-            label="Accept"
+            label={DECISION_LABELS.accept.button}
             icon={<Check size={14} />}
             variant="primary"
             saving={saving}
             justDecided={justDecided}
             onClick={() => decide("accept")}
-            shortcut="A"
+            shortcut="E"
           />
           <DecisionButton
             action="reject"
-            label="Reject"
+            label={DECISION_LABELS.reject.button}
             icon={<X size={14} />}
             variant="danger"
             saving={saving}
@@ -431,8 +428,8 @@ export function EvidenceDrawer({
             disabled={rejectionNeedsReason}
             title={
               rejectionNeedsReason
-                ? "A rejection needs a reason of at least three words"
-                : "Reject"
+                ? "Clearing a finding needs a reason of at least three words"
+                : "Record that you checked this and it is not a concern"
             }
             onClick={() => decide("reject")}
           />
@@ -450,7 +447,7 @@ export function EvidenceDrawer({
         {rejectionNeedsReason ? (
           <p className="mt-2 flex items-center gap-1.5 text-[11px] text-ink-faint">
             <FileText size={11} />
-            Rejecting needs a reason — someone will ask why this was dismissed.
+            Clearing needs a reason — someone will ask why this was set aside.
             {words > 0 ? ` (${words} of 3 words)` : null}
           </p>
         ) : null}

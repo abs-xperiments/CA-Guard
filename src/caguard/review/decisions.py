@@ -38,6 +38,16 @@ class ReviewAction(StrEnum):
         return self in {ReviewAction.ACCEPT, ReviewAction.REJECT}
 
 
+#: How each decision is named wherever a person reads it (D-055). Stored values
+#: are unchanged; "accept" read to an accountant as "the entry is fine", the
+#: opposite of what it meant.
+DECISION_LABELS: dict[ReviewAction, str] = {
+    ReviewAction.ACCEPT: "Exception — follow up",
+    ReviewAction.REJECT: "Cleared — not a concern",
+    ReviewAction.INVESTIGATE: "Investigating",
+    ReviewAction.ADJUST: "Re-banded",
+}
+
 #: Actions a reviewer must justify. Rejection is the one that later needs
 #: defending; the others leave a trail that speaks for itself.
 REQUIRES_NOTE: frozenset[ReviewAction] = frozenset({ReviewAction.REJECT})

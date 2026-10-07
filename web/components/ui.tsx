@@ -9,6 +9,7 @@
 
 import type { ReactNode } from "react";
 import type { RiskBand } from "@/lib/types";
+import { DECISION_LABELS } from "@/lib/types";
 
 export function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
@@ -41,13 +42,10 @@ const STATUS_STYLES: Record<string, string> = {
   adjust: "text-ink-muted",
 };
 
-/** Reads as a sentence, because "accept" alone is ambiguous in a table. */
-const STATUS_WORDS: Record<string, string> = {
-  accept: "Accepted",
-  reject: "Rejected",
-  investigate: "Investigating",
-  adjust: "Re-banded",
-};
+/** From the one list of decision words, so the table and the drawer agree. */
+const STATUS_WORDS: Record<string, string> = Object.fromEntries(
+  Object.entries(DECISION_LABELS).map(([action, label]) => [action, label.status]),
+);
 
 export function StatusLabel({ status }: { status: string }) {
   if (status === "not yet reviewed") {
