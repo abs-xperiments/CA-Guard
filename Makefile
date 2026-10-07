@@ -1,5 +1,5 @@
 # Everything here runs locally and costs nothing.
-.PHONY: help install lint fmt types test test-all data generate check clean smoke
+.PHONY: help install lint fmt types test test-all data generate check clean smoke e2e
 
 help:
 	@grep -E '^[a-z-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-12s\033[0m %s\n", $$1, $$2}'
@@ -34,6 +34,11 @@ benchmark:  ## Regenerate every number the project claims
 smoke:  ## End-to-end check through the built workspace (needs `make web-install` + build)
 	cd web && npm run build
 	uv run python scripts/smoke_workspace.py
+
+e2e:  ## Browser tests of the whole workflow (needs a web build; installs Chromium once)
+	cd web && npm run build
+	uv run playwright install chromium
+	CAGUARD_E2E=1 uv run pytest tests/e2e
 
 docker:  ## Build and run the self-hosted image on 127.0.0.1:3000
 	docker compose up --build

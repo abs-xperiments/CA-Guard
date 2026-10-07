@@ -18,13 +18,14 @@ import io
 import logging
 import os
 import secrets
+import sqlite3
 import tempfile
 from pathlib import Path
 
 import pandas as pd
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 
 from caguard.api.auth_routes import build_auth_router, current_user_dependency
 from caguard.api.jobs import JobRunner, Progress, TooBusyError
@@ -101,6 +102,7 @@ def create_app(
         version="0.1.0",
     )
     app.middleware("http")(_security_headers)
+    app.add_exception_handler(sqlite3.OperationalError, _storage_unavailable)
     app.state.workspace = workspace
     jobs = JobRunner()
     app.state.jobs = jobs
@@ -386,6 +388,34 @@ async def _security_headers(request: Request, call_next):
     if request.url.path.endswith("/report.html"):
         response.headers["Content-Security-Policy"] = REPORT_CSP
     return response
+
+
+async def _storage_unavailable(request: Request, exc: Exception) -> JSONResponse:
+    """The database could not be read or written: say so, and that nothing was saved.
+
+    A read-only volume, a full disk or a lock held too long all end up here. The
+    reviewer is told what did not happen; the operator gets an error reference
+    and the error type in the log — never the query or its values.
+    """
+    error_id = secrets.token_hex(4)
+    event(
+        logger,
+        "storage.unavailable",
+        logging.ERROR,
+        error_id=error_id,
+        error_type=type(exc).__name__,
+        method=request.method,
+    )
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": (
+                "CA-Guard could not write to its database — it may be read-only, locked by "
+                "another program, or the disk may be full. Nothing was saved. "
+                f"Error reference: {error_id}."
+            )
+        },
+    )
 
 
 def _accepted(file: UploadFile) -> tuple[str, str]:

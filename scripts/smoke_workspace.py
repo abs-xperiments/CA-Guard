@@ -16,59 +16,33 @@ from __future__ import annotations
 
 import io
 import os
-import shutil
-import socket
-import subprocess
 import sys
-import tempfile
 import time
-import urllib.error
 from pathlib import Path
 
 import httpx
 import pandas as pd
+from stack import StackError, running_stack
 
 from caguard.benchmark.generator import GeneratorConfig, generate
 
 ROOT = Path(__file__).resolve().parent.parent
-API = "http://127.0.0.1:8000"
 WEB_PORT = int(os.environ.get("SMOKE_WEB_PORT", "3999"))
-WEB = f"http://127.0.0.1:{WEB_PORT}"
 
 #: Comfortably past the 10 MB proxy default that used to break uploads.
 TARGET_BYTES = 25 * 1024 * 1024
 
 
 def main() -> int:
-    if not (ROOT / "web" / ".next" / "BUILD_ID").exists():
-        print("web/ is not built. Run: cd web && npm run build", file=sys.stderr)
+    try:
+        with running_stack(WEB_PORT) as stack:
+            return _run_checks(stack.web, _large_ledger(stack.data_dir))
+    except StackError as exc:
+        print(exc, file=sys.stderr)
         return 2
 
-    for port in (8000, WEB_PORT):
-        if _port_in_use(port):
-            # A server already on the port would answer instead of the build
-            # under test — and every check would quietly test the wrong code.
-            print(f"Port {port} is already in use. Stop whatever is running there first.",
-                  file=sys.stderr)  # fmt: skip
-            return 2
 
-    workdir = Path(tempfile.mkdtemp(prefix="caguard-smoke-"))
-    processes: list[subprocess.Popen[bytes]] = []
-    try:
-        processes.append(_start_api(workdir))
-        _wait_for(f"{API}/api/health")
-        processes.append(_start_web())
-        _wait_for(f"{WEB}/api/health")
-        return _run_checks(_large_ledger(workdir))
-    finally:
-        for process in processes:
-            process.terminate()
-        for process in processes:
-            process.wait(timeout=10)
-        shutil.rmtree(workdir, ignore_errors=True)
-
-
-def _run_checks(ledger: Path) -> int:
+def _run_checks(web_url: str, ledger: Path) -> int:
     failures: list[str] = []
 
     def check(name: str, ok: bool, detail: str = "") -> None:
@@ -76,7 +50,7 @@ def _run_checks(ledger: Path) -> int:
         if not ok:
             failures.append(name)
 
-    with httpx.Client(base_url=WEB, timeout=180) as web:
+    with httpx.Client(base_url=web_url, timeout=180) as web:
         page = web.get("/login")
         csp = page.headers.get("content-security-policy", "")
         check(
@@ -113,7 +87,7 @@ def _run_checks(ledger: Path) -> int:
             )
 
         forwarded = httpx.post(
-            f"{WEB}/api/auth/login",
+            f"{web_url}/api/auth/login",
             json={"email": "smoke@example.com", "password": "smoke-pass-123"},
             headers={"X-Forwarded-Proto": "https"},
         )
@@ -124,7 +98,7 @@ def _run_checks(ledger: Path) -> int:
             cookie.split(";")[0][:24] + "…" if cookie else "no cookie",
         )
         plain = httpx.post(
-            f"{WEB}/api/auth/login",
+            f"{web_url}/api/auth/login",
             json={"email": "smoke@example.com", "password": "smoke-pass-123"},
         )
         check(
@@ -150,41 +124,6 @@ def _large_ledger(workdir: Path) -> Path:
     path = workdir / "big-ledger.csv"
     pd.concat(frames).to_csv(path, index=False)
     return path
-
-
-def _start_api(workdir: Path) -> subprocess.Popen[bytes]:
-    return subprocess.Popen(
-        [sys.executable, "-m", "caguard.cli", "serve", "--port", "8000",
-         "--store", str(workdir / "review.db")],
-        cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-    )  # fmt: skip
-
-
-def _start_web() -> subprocess.Popen[bytes]:
-    return subprocess.Popen(
-        # The project's own Next binary, not npx: npx can stall resolving the
-        # package, and the build under test is the one in web/node_modules.
-        [str(ROOT / "web" / "node_modules" / ".bin" / "next"), "start",
-         "--port", str(WEB_PORT), "--hostname", "127.0.0.1"],
-        cwd=ROOT / "web", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-    )  # fmt: skip
-
-
-def _port_in_use(port: int) -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
-        return probe.connect_ex(("127.0.0.1", port)) == 0
-
-
-def _wait_for(url: str, seconds: float = 60) -> None:
-    deadline = time.monotonic() + seconds
-    while time.monotonic() < deadline:
-        try:
-            if httpx.get(url, timeout=2).status_code == 200:
-                return
-        except (httpx.HTTPError, urllib.error.URLError):
-            pass
-        time.sleep(0.5)
-    raise RuntimeError(f"{url} did not come up within {seconds:.0f}s")
 
 
 if __name__ == "__main__":

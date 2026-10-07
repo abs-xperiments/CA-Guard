@@ -868,3 +868,38 @@ Before changing anything, I re-read the whole project. Then I actually *used* it
 
 **Next step:** Phase 7, a full test sweep. Browser-driven end-to-end tests of the whole workflow, the remaining awkward inputs, restart in the middle of a review, and three walk-throughs as different kinds of user.
 
+---
+
+## 2026-10-08 01:23 IST — [PHASE 7 of completion] Automated browser tests of the whole review, and clear messages when storage fails.
+
+**What happened:**
+- **The whole review now has automated browser tests**, in a real (hidden) browser:
+  - sign up, upload a ledger, open the top finding;
+  - check the explanation is all there and jump to the rows in the file;
+  - press a decision key while a pop-up is open and confirm nothing happens;
+  - get the written explanation, record an exception with the keyboard, then clear the next finding with a reason;
+  - **download the original and check it is byte-for-byte the uploaded file**;
+  - open the report and check it shows both decisions in the right place;
+  - reload via a link to a finding; search; sign out.
+  
+  It takes 11 seconds and runs automatically on every push. Until now, this path was checked only by me clicking through by hand.
+- **When CA-Guard can't save to its database** (read-only folder, full disk, another program holding it), you get a clear message: what failed, that nothing was saved, and an error reference. Before, it showed "Internal Server Error". Both cases are tested.
+- **I walked through the product as three kinds of user:**
+  - an experienced CA in a hurry: works well;
+  - a junior article assistant: needs a bit more explanation in the queue;
+  - someone non-technical on their first day: the first screens could guide better.
+  
+  Six concrete improvements are written up in `docs/USABILITY_WALKTHROUGHS.md` for the polish phase. The two most useful:
+  - a brand-new install should go straight to "Create your account";
+  - the public demo should offer **"Try it with a sample ledger"**, so a faculty reviewer can see the product without having a ledger of their own.
+
+**One honest note:** these walk-throughs were me role-playing, not real users. The single most valuable check still outstanding is a practising CA trying it.
+
+**Tests/checks:**
+- ruff ✅ · pyright 0 errors ✅ · **672 tests** ✅ (2 new) · **3 browser tests** ✅
+- CI now runs lint, types, tests, audits, the build, the smoke test and the browser tests ✅
+
+**Founder decision needed:** none.
+
+**Next step:** Phase 8, polish. The six walk-through improvements first, then a pass over spacing, wording, empty and error states, tablet width and accessibility.
+

@@ -328,7 +328,24 @@ Fixed along the way: workspace keyboard shortcuts now pause while any dialog is 
 - all existing privacy tests still pass, plus new ones for stored originals;
 - a `/security-review` pass with findings resolved or recorded.
 
-### Phase 7 — Test and reliability sweep
+### Phase 7 — Test and reliability sweep — ✅ done 2026-10-08 01:23 IST
+
+**How the criteria were met:**
+- **Browser tests** (`tests/e2e`, Playwright, dev-only; `make e2e`; run in the CI smoke job) drive the whole journey:
+  - sign up → upload → open a finding;
+  - check the card, the evidence count and the review steps;
+  - view the source rows and confirm a stray `e` behind the dialog does nothing;
+  - explain → exception by keyboard → clear with a reason;
+  - download the original and compare SHA-256 with the upload;
+  - check that the report separates observation from decision;
+  - deep link after reload; search, including an empty result.
+  - Plus an unreadable upload and sign-out ending the session.
+- **One shared stack helper** (`scripts/stack.py`) for the smoke script and the browser tests. It refuses busy ports.
+- **Storage failures:** a read-only or locked database now gives a 503 saying what failed and that nothing was saved, with an error reference. Previously it was a bare "Internal Server Error". Tested for both cases; a decision goes through once the lock clears.
+- **Already covered in earlier phases:** malformed, empty, duplicate, huge and unsupported files; a missing, slow or lying model; no network; restart; concurrency.
+- **Three persona walk-throughs** recorded in `docs/USABILITY_WALKTHROUGHS.md`. Their findings (W1–W6) are all presentation and go to Phase 8.
+
+**Found by the browser test:** nothing in the product. One timing assumption in the test itself was corrected: it now waits for the drawer to move on after a decision, as a person would.
 **Acceptance:** browser-level end-to-end tests drive the full path: upload → findings → open finding → explain → evidence → view/download original → decide → report. Playwright is a dev-only dependency, justified because B1 was invisible to API-level tests.
 
 Also covered:
