@@ -18,6 +18,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 import caguard.api.app as app_module
+import caguard.api.workspace as workspace_module
 from caguard.api.app import create_app
 from caguard.benchmark.generator import GeneratorConfig, generate
 from caguard.intake.readers import IntakeError, read_table
@@ -147,7 +148,7 @@ def test_an_unexpected_analysis_failure_gives_a_reference_not_an_exception(
     def explode(*_args: object, **_kwargs: object) -> None:
         raise RuntimeError("internal detail that must not reach the user")
 
-    monkeypatch.setattr(app_module, "build_findings", explode)
+    monkeypatch.setattr(workspace_module, "build_findings", explode)
     response = _upload(client, "books.csv", _csv(ledger, "utf-8"))
 
     assert response.status_code == 500
@@ -173,13 +174,13 @@ def test_the_server_answers_while_a_ledger_is_being_analysed(
     client: TestClient, ledger: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Analysis on the event loop froze every request until it finished."""
-    real = app_module.build_findings
+    real = workspace_module.build_findings
 
     def slow(*args, **kwargs):
         time.sleep(1.5)
         return real(*args, **kwargs)
 
-    monkeypatch.setattr(app_module, "build_findings", slow)
+    monkeypatch.setattr(workspace_module, "build_findings", slow)
     payload = _csv(ledger, "utf-8")
     worker = threading.Thread(target=_upload, args=(client, "slow.csv", payload))
     worker.start()
@@ -238,7 +239,7 @@ def test_a_failure_log_never_contains_ledger_values(
     def explode(*_args: object, **_kwargs: object) -> None:
         raise ValueError(f"could not convert {marker!r}")
 
-    monkeypatch.setattr(app_module, "build_findings", explode)
+    monkeypatch.setattr(workspace_module, "build_findings", explode)
     with caplog.at_level("DEBUG"):
         response = _upload(client, "books.csv", _csv(ledger, "utf-8"))
 

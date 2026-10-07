@@ -37,11 +37,14 @@ That is the whole installation. No account, no key, no card, no external service
 
 | | |
 |---|---|
-| Uploaded ledgers | Read, analysed, **never stored** |
-| Findings | Recomputed from the ledger every time |
+| **Uploaded ledgers (originals)** | `/data/sources/<sha256>.<ext>`, byte-for-byte, owner-only permissions. Kept until an administrator deletes them (D-054). |
+| Source file records | `/data/review.db` (name, size, fingerprint, who uploaded it, when) |
+| Findings | Recomputed from the stored original; never stored themselves |
 | **Review decisions and the audit trail** | `/data/review.db` in the `caguard-data` volume |
 
-**Back up that volume.** The decisions are the only thing in the system that cannot be recomputed.
+**Back up that volume.** It holds the decisions, which cannot be recomputed, and the client's original files. Treat the backup as you would the client's books: it *is* a copy of them.
+
+**Deleting a client's file.** In the workspace, open the engagement → **Source** → **Delete** (administrators only). The bytes are removed from disk; the record that the file existed, and every decision made on it, are kept for the audit trail.
 
 ```bash
 docker run --rm -v caguard-data:/data -v "$PWD:/backup" alpine \

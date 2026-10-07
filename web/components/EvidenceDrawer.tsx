@@ -26,10 +26,11 @@ import {
   X,
 } from "lucide-react";
 import { ApiError, api } from "@/lib/api";
-import type { Decision, Explanation, Finding, ReviewAction } from "@/lib/types";
+import type { Decision, Explanation, Finding, LedgerLine, ReviewAction } from "@/lib/types";
 import { concernLabel, ukDate } from "@/lib/types";
+import { SourcePreview } from "./SourcePreview";
 import { useToast } from "./Toast";
-import { BandBadge, Button, EvidenceMeter, Key, StatusLabel, cx } from "./ui";
+import { BandBadge, Button, EvidenceMeter, Key, StatusLabel, cx, shortcutBlocked } from "./ui";
 
 const ACTION_WORDS: Record<ReviewAction, string> = {
   accept: "Accepted",
@@ -61,6 +62,10 @@ export function EvidenceDrawer({
   const [explanation, setExplanation] = useState<Explanation | null>(null);
   const [explaining, setExplaining] = useState(false);
   const [trail, setTrail] = useState<Decision[]>([]);
+  // The queue carries findings without their ledger lines; the full record,
+  // with the transaction and where it sits in the file, is fetched on open.
+  const [detail, setDetail] = useState<Finding | null>(null);
+  const [viewingFile, setViewingFile] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -68,7 +73,13 @@ export function EvidenceDrawer({
     setError(null);
     setExplanation(null);
     setJustDecided(null);
+    setDetail(null);
+    setViewingFile(false);
     api.trail(engagementId, finding.voucher_id).then(setTrail).catch(() => setTrail([]));
+    api
+      .finding(engagementId, finding.voucher_id)
+      .then(setDetail)
+      .catch(() => setDetail(null));
     panel.current?.focus();
   }, [engagementId, finding.voucher_id]);
 
@@ -142,9 +153,7 @@ export function EvidenceDrawer({
   // between the keyboard and the mouse mid-queue.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null;
-      if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (shortcutBlocked(event)) return;
 
       if (event.key === "a") void decide("accept");
       else if (event.key === "i") void decide("investigate");
@@ -233,17 +242,46 @@ export function EvidenceDrawer({
           </div>
         </Section>
 
-        <Section title="Source lines">
-          <div className="flex flex-wrap gap-1.5">
-            {finding.line_ids.map((lineId) => (
-              <span
-                key={lineId}
-                className="rounded bg-canvas px-2 py-1 font-mono text-[11px] text-ink-muted ring-1 ring-inset ring-line"
-              >
-                {lineId}
+        <Section title="The transaction">
+          {detail && detail.lines.length ? (
+            <Transaction lines={detail.lines} />
+          ) : (
+            <div className="flex flex-wrap gap-1.5">
+              {finding.line_ids.map((lineId) => (
+                <span
+                  key={lineId}
+                  className="rounded bg-canvas px-2 py-1 font-mono text-[11px] text-ink-muted ring-1 ring-inset ring-line"
+                >
+                  {lineId}
+                </span>
+              ))}
+            </div>
+          )}
+          {detail?.source ? (
+            <div className="mt-2 flex items-center justify-between gap-3 text-[12px] text-ink-muted">
+              <span className="flex min-w-0 items-center gap-1.5">
+                <FileText size={13} className="shrink-0 text-ink-faint" />
+                <span className="truncate">
+                  From <span className="font-medium text-ink">{detail.source.filename}</span>
+                  {sourceRows(detail.lines)}
+                </span>
               </span>
-            ))}
-          </div>
+              <Button variant="quiet" onClick={() => setViewingFile(true)}>
+                View in file
+              </Button>
+            </div>
+          ) : null}
+          {viewingFile && detail?.source ? (
+            <SourcePreview
+              engagementId={engagementId}
+              sourceId={detail.source.id}
+              filename={detail.source.filename}
+              highlightRows={detail.lines
+                .map((line) => line.source_row)
+                .filter((row): row is number => row !== null)}
+              onClose={() => setViewingFile(false)}
+            />
+          ) : null}
         </Section>
 
         <Section title="Plain-language explanation">
@@ -512,4 +550,90 @@ function Present({
       </dd>
     </div>
   );
+}
+
+/** The voucher's lines as a reviewer reads a journal: account, debit, credit, narration. */
+function Transaction({ lines }: { lines: LedgerLine[] }) {
+  const narrations = Array.from(
+    new Set(lines.map((line) => line.narration).filter((n): n is string => Boolean(n))),
+  );
+  const references = Array.from(
+    new Set(lines.map((line) => line.document_ref).filter((r): r is string => Boolean(r))),
+  );
+  const first = lines[0];
+  return (
+    <div className="overflow-hidden rounded-md border border-line">
+      <table className="w-full text-[12px]">
+        <thead className="bg-canvas text-ink-faint">
+          <tr>
+            <th className="px-3 py-1.5 text-left font-medium">Account</th>
+            <th className="px-3 py-1.5 text-right font-medium">Debit</th>
+            <th className="px-3 py-1.5 text-right font-medium">Credit</th>
+            <th className="px-3 py-1.5 text-right font-medium" title="Row in the uploaded file">
+              Row
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {lines.map((line) => (
+            <tr key={line.line_id} className="border-t border-line">
+              <td className="px-3 py-1.5">
+                <span className="text-ink">{line.account_name || "—"}</span>
+                <span className="ml-1.5 font-mono text-[11px] text-ink-faint">
+                  {line.account_code}
+                </span>
+              </td>
+              <td className="tabular px-3 py-1.5 text-right text-ink">{line.debit_display}</td>
+              <td className="tabular px-3 py-1.5 text-right text-ink">{line.credit_display}</td>
+              <td className="tabular px-3 py-1.5 text-right text-ink-faint">
+                {line.source_row?.toLocaleString("en-IN") ?? "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1 border-t border-line bg-canvas/40 px-3 py-2.5 text-[12px]">
+        <dt className="text-ink-faint">Narration</dt>
+        <dd className="text-ink">
+          {narrations.length ? narrations.join(" · ") : <Absent>none recorded</Absent>}
+        </dd>
+        <dt className="text-ink-faint">Document ref.</dt>
+        <dd className="text-ink">
+          {references.length ? references.join(", ") : <Absent>none recorded</Absent>}
+        </dd>
+        <dt className="text-ink-faint">Prepared by</dt>
+        <dd className="text-ink">{first?.created_by ?? <Absent>not recorded</Absent>}</dd>
+        <dt className="text-ink-faint">Approved by</dt>
+        <dd className="text-ink">{first?.approved_by ?? <Absent>not recorded</Absent>}</dd>
+        {first?.posted_at ? (
+          <>
+            <dt className="text-ink-faint">Entered</dt>
+            <dd className="tabular text-ink">
+              {ukDate(first.posted_at.slice(0, 10))} {first.posted_at.slice(11, 16)}
+            </dd>
+          </>
+        ) : null}
+        {first?.voucher_type ? (
+          <>
+            <dt className="text-ink-faint">Voucher type</dt>
+            <dd className="text-ink">{first.voucher_type.replace(/_/g, " ")}</dd>
+          </>
+        ) : null}
+      </dl>
+    </div>
+  );
+}
+
+function Absent({ children }: { children: string }) {
+  return <span className="text-ink-faint italic">{children}</span>;
+}
+
+/** " · rows 1,842–1,843" — where in the file this voucher sits. */
+function sourceRows(lines: LedgerLine[]): string {
+  const rows = lines.map((line) => line.source_row).filter((r): r is number => r !== null);
+  if (!rows.length) return "";
+  const low = Math.min(...rows);
+  const high = Math.max(...rows);
+  const fmt = (n: number) => n.toLocaleString("en-IN");
+  return low === high ? ` · row ${fmt(low)}` : ` · rows ${fmt(low)}–${fmt(high)}`;
 }

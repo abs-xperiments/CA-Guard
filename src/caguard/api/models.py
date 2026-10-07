@@ -10,12 +10,14 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
 
 from caguard.money import format_inr
 from caguard.review.decisions import Decision, ReviewAction
 from caguard.review.engagement import Engagement
 from caguard.review.finding import Finding, RiskBand
+from caguard.review.store import SourceFile
 
 
 class SignalOut(BaseModel):
@@ -36,6 +38,134 @@ class EvidenceOut(BaseModel):
     summary: str
 
 
+class LineOut(BaseModel):
+    """One ledger line behind a finding, with where it sits in the uploaded file."""
+
+    line_id: str
+    line_number: int | None = None
+    account_code: str = ""
+    account_name: str = ""
+    debit_paise: int = 0
+    credit_paise: int = 0
+    debit_display: str = ""
+    credit_display: str = ""
+    narration: str | None = None
+    document_ref: str | None = None
+    voucher_type: str | None = None
+    cost_centre: str | None = None
+    created_by: str | None = None
+    approved_by: str | None = None
+    posted_at: str | None = None
+    #: The row in the original file, numbered as a spreadsheet shows it.
+    source_row: int | None = None
+
+    @classmethod
+    def from_frame(cls, lines: pd.DataFrame) -> list[LineOut]:
+        out: list[LineOut] = []
+        for record in lines.to_dict("records"):
+            debit = _int(record.get("debit_paise"))
+            credit = _int(record.get("credit_paise"))
+            out.append(
+                cls(
+                    line_id=str(record.get("line_id", "")),
+                    line_number=_int(record.get("line_number")) or None,
+                    account_code=_text(record.get("account_code")) or "",
+                    account_name=_text(record.get("account_name")) or "",
+                    debit_paise=debit,
+                    credit_paise=credit,
+                    debit_display=format_inr(debit) if debit else "",
+                    credit_display=format_inr(credit) if credit else "",
+                    narration=_text(record.get("narration")),
+                    document_ref=_text(record.get("document_ref")),
+                    voucher_type=_text(record.get("voucher_type")),
+                    cost_centre=_text(record.get("cost_centre")),
+                    created_by=_text(record.get("created_by")),
+                    approved_by=_text(record.get("approved_by")),
+                    posted_at=_text(record.get("posted_at")),
+                    source_row=_int(record.get("source_row")) or None,
+                )
+            )
+        return out
+
+
+class SourceFileOut(BaseModel):
+    """An uploaded file as the reviewer sees it."""
+
+    id: str
+    engagement_id: str
+    filename: str
+    file_type: str
+    size_bytes: int
+    sha256: str
+    uploaded_at: datetime
+    uploaded_by: str
+    rows_read: int
+    rows_used: int
+    available: bool
+    deleted_at: datetime | None = None
+    deleted_by: str | None = None
+
+    @classmethod
+    def build(cls, source: SourceFile, *, available: bool) -> SourceFileOut:
+        return cls(
+            id=source.id,
+            engagement_id=source.engagement_id,
+            filename=source.filename,
+            file_type=_FILE_TYPES.get(source.suffix, source.suffix),
+            size_bytes=source.size_bytes,
+            sha256=source.sha256,
+            uploaded_at=source.uploaded_at,
+            uploaded_by=source.uploaded_by,
+            rows_read=source.rows_read,
+            rows_used=source.rows_used,
+            available=available and not source.is_deleted,
+            deleted_at=source.deleted_at,
+            deleted_by=source.deleted_by,
+        )
+
+
+class SourceRefOut(BaseModel):
+    """Which uploaded file a finding's lines were read from."""
+
+    id: str
+    filename: str
+
+
+class PreviewRowOut(BaseModel):
+    row: int
+    values: list[str | None]
+
+
+class PreviewOut(BaseModel):
+    """A window onto the uploaded file, exactly as it was read — before any mapping."""
+
+    source_id: str
+    filename: str
+    columns: list[str]
+    rows: list[PreviewRowOut]
+    total_rows: int
+    offset: int
+
+
+_FILE_TYPES = {".csv": "CSV", ".xlsx": "Excel", ".xls": "Excel 97-2003", ".parquet": "Parquet"}
+
+
+def _text(value: object) -> str | None:
+    if value is None or (isinstance(value, float) and pd.isna(value)) or value is pd.NaT:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _int(value: object) -> int:
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return 0
+    try:
+        return int(value)  # pyright: ignore[reportArgumentType]
+    except (TypeError, ValueError):
+        return 0
+
+
 class FindingOut(BaseModel):
     voucher_id: str
     voucher_date: str
@@ -50,9 +180,20 @@ class FindingOut(BaseModel):
     status: str = "not yet reviewed"
     reviewer: str | None = None
     note: str | None = None
+    #: The transaction itself. Filled for a single finding, left empty in the
+    #: queue so a 36,000-finding queue is not also 100,000 ledger lines.
+    lines: list[LineOut] = Field(default_factory=list)
+    source: SourceRefOut | None = None
 
     @classmethod
-    def build(cls, finding: Finding, decision: Decision | None = None) -> FindingOut:
+    def build(
+        cls,
+        finding: Finding,
+        decision: Decision | None = None,
+        *,
+        lines: pd.DataFrame | None = None,
+        source: SourceFile | None = None,
+    ) -> FindingOut:
         return cls(
             voucher_id=finding.voucher_id,
             voucher_date=finding.voucher_date,
@@ -87,6 +228,8 @@ class FindingOut(BaseModel):
             status=decision.action.value if decision else "not yet reviewed",
             reviewer=decision.reviewer if decision else None,
             note=decision.note if decision else None,
+            lines=LineOut.from_frame(lines) if lines is not None else [],
+            source=SourceRefOut(id=source.id, filename=source.filename) if source else None,
         )
 
 

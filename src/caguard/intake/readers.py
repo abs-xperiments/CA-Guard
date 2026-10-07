@@ -124,7 +124,14 @@ def _read_csv(path: Path, name: str) -> tuple[pd.DataFrame, str]:
     for encoding in candidates:
         try:
             frame = pd.read_csv(
-                path, dtype=str, keep_default_na=False, na_values=[""], encoding=encoding
+                path,
+                dtype=str,
+                keep_default_na=False,
+                na_values=[""],
+                encoding=encoding,
+                # Blank lines are kept (and dropped later, by index) so that a
+                # line's position still matches the row Excel shows for it.
+                skip_blank_lines=False,
             )
         except UnicodeDecodeError:
             continue

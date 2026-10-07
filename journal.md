@@ -689,3 +689,36 @@ Before changing anything, I re-read the whole project. Then I actually *used* it
 **Founder decision needed:** none.
 
 **Next step:** Phase 2. CA-Guard keeps your uploaded files, so you can download the exact original, every finding points at its row in your file, and nothing has to be re-uploaded after a restart.
+
+---
+
+## 2026-10-07 22:50 IST — [PHASE 2 of completion] Your uploaded files are kept, downloadable, and every finding points at its row.
+
+**What happened:**
+- **"Where did my ledger go?" is answered.** Every engagement has a **Source** button. It lists each file uploaded to it: name, type, size, who uploaded it and when, how many rows were used, and a fingerprint.
+- **Download original** gives back the exact file. I checked byte for byte, through the real screen, that the downloaded file is identical to the uploaded one.
+- **"Which file, which row, did this come from?" is answered.** Opening a finding now shows the transaction itself:
+  - account names (not just codes);
+  - debit and credit;
+  - the narration and document reference;
+  - who prepared it, whether anyone approved it, and when it was entered.
+  
+  Under it you see *"From ledger.xlsx · rows 8,916–8,917"*. **View in file** opens the file at those exact rows, highlighted, among their neighbours. I confirmed in Excel itself that rows 8,916 and 8,917 really are those lines.
+- **Restarting no longer loses anything.** CA-Guard re-opens an engagement from its stored file and gets identical findings, with your decisions intact.
+- **Deleting a client's file** is available to administrators only. It takes two clicks and cannot be undone. The file is really removed from disk. The record that it existed, and every decision made on it, stay, because an audit trail must still say what a decision was made on.
+
+**Why it matters:** this is traceability. A CA can now go from "this is flagged" to the exact line in the client's own file, which is what makes a finding checkable rather than something to take on trust.
+
+**Privacy wording updated to match.** CA-Guard used to say files were "never stored". That is no longer true, so every screen and document now says what *is* true: the file stays on the computer running CA-Guard and is never sent to an outside service. `docs/08_SECURITY_PRIVACY.md` has a table of where client data sits at every step.
+
+**A bug I caught while testing:** CA-Guard's keyboard shortcuts were active even while a pop-up was open. Pressing "a" with the file preview open would have quietly recorded a decision on a finding you couldn't see. Shortcuts now pause whenever a pop-up is open, and I tested it.
+
+**Tests/checks:**
+- ruff ✅ · pyright 0 errors ✅ · **591 tests** ✅ (30 new) · TypeScript ✅ · web build ✅
+- browser walk-through of upload → finding → view in file → source panel → download ✅
+
+**Existing data:** an older database upgrades itself automatically, keeping its decisions (tested). Engagements opened *before* today have no stored file, so they ask for one re-upload. The screen says exactly that.
+
+**Founder decision needed:** none.
+
+**Next step:** Phase 3, the Explain Finding experience. For each signal it adds the working (for example "typical for this account: ₹40,000–₹1,20,000, from 312 entries"), clearer contribution labels, "not in this file" versus "missing" evidence, similar transactions, a suggested next step, and a guard that rejects an AI explanation that leaves a concern out.

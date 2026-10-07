@@ -185,3 +185,80 @@ export function Stat({ label, value, tone }: { label: string; value: ReactNode; 
     </div>
   );
 }
+
+/**
+ * A dialog over the workspace. Escape closes it and focus moves into it, so a
+ * keyboard reviewer is never stranded behind an overlay.
+ */
+export function Modal({
+  title,
+  subtitle,
+  onClose,
+  children,
+  footer,
+  wide,
+}: {
+  title: string;
+  subtitle?: ReactNode;
+  onClose: () => void;
+  children: ReactNode;
+  footer?: ReactNode;
+  wide?: boolean;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-40 flex items-start justify-center bg-ink/25 px-4 py-10 backdrop-blur-[1px]"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        tabIndex={-1}
+        ref={(node) => node?.focus()}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.stopPropagation();
+            onClose();
+          }
+        }}
+        className={cx(
+          "animate-fade-up flex max-h-full w-full flex-col overflow-hidden rounded-lg bg-surface shadow-xl ring-1 ring-line outline-none",
+          wide ? "max-w-6xl" : "max-w-3xl",
+        )}
+      >
+        <header className="flex items-start justify-between gap-4 border-b border-line px-5 py-4">
+          <div className="min-w-0">
+            <h2 className="truncate text-sm font-semibold text-ink">{title}</h2>
+            {subtitle ? <div className="mt-0.5 text-[12px] text-ink-muted">{subtitle}</div> : null}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="rounded p-1 text-ink-muted hover:bg-canvas hover:text-ink"
+          >
+            ✕
+          </button>
+        </header>
+        <div className="flex-1 overflow-auto">{children}</div>
+        {footer ? <footer className="border-t border-line px-5 py-3">{footer}</footer> : null}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Whether a workspace shortcut should be ignored for this key press: the
+ * reviewer is typing, using a modifier, or a dialog is open. The last matters
+ * most — with a file preview open, a stray "a" must not record a decision on a
+ * finding the reviewer cannot even see.
+ */
+export function shortcutBlocked(event: KeyboardEvent): boolean {
+  const target = event.target as HTMLElement | null;
+  if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return true;
+  if (event.metaKey || event.ctrlKey || event.altKey) return true;
+  return document.querySelector('[role="dialog"][aria-modal="true"]') !== null;
+}

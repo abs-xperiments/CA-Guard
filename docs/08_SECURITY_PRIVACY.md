@@ -47,3 +47,24 @@ Railway is hosted infrastructure. The demo must therefore use synthetic/public d
 - CSP and security headers (Phase 6);
 - structured, metadata-only logging (Phase 5);
 - a data-lifecycle table once original files are stored (Phase 2).
+
+## Data lifecycle (since 2026-10-07, D-054)
+
+Where a client's ledger exists at each step, on a self-hosted install. On the Railway demo the same is true, but "this machine" is a hosted server, which is why the demo is synthetic-data only (D-005, D-052).
+
+| Step | Where the data is | How long | Who can reach it |
+|---|---|---|---|
+| Upload in transit | Browser → workspace (Next.js, same machine) → API on loopback | Seconds | Nothing outside the machine; the API is never published |
+| Receiving | `data/upload-<random>.<ext>` (0600), unique per request | Until analysis ends; removed on every failure path | The CA-Guard process |
+| **Stored original** | `data/sources/<sha256>.<ext>` (0600, directory 0700). Exact bytes; re-hashed before every download. | **Until an administrator deletes it** | Signed-in reviewers via the workspace; deletion is admin-only |
+| Source record | `data/review.db` → `source_files`: filename, size, SHA-256, uploader, row counts, deletion record | Kept after the file is deleted, so the trail can still say which file a decision was made on | Signed-in reviewers |
+| Parsed ledger + findings | Process memory only | Until restart; rebuilt from the stored original on next open | The CA-Guard process |
+| Explanation prompt | Only if a local model is configured: the finding's verified facts (no ledger rows, no narration) go to Ollama on loopback | Duration of one request | The local model process |
+| Decisions and audit trail | `data/review.db` → `decisions`, append-only | Permanent; never edited or deleted | Signed-in reviewers |
+| Report | Generated on request, sent to the browser; not written to disk | — | The reviewer who downloads it |
+| Logs | stderr / container logs: event names, ids, counts, durations, error types. **Never ledger contents** (tested). | Per the host's log retention | Whoever operates the machine |
+| Backups | Whatever the firm does with the `/data` volume. It contains the originals. | Firm policy | Firm policy |
+
+**What CA-Guard does not do:** send a ledger, a row, a narration or a finding to any outside service. `tests/test_security.py::test_analysis_needs_no_network` runs the analysis with every socket blocked.
+
+**Retention:** CA-Guard never deletes a file on its own. Under SQC 1 / SA 230, a firm keeps audit documentation for at least seven years. Whether a copy of the client's ledger forms part of that documentation is the firm's decision, not CA-Guard's. Under the DPDP Act, which is expected to take full effect in May 2027, the firm should also record why it keeps personal data inside ledgers, such as vendor and employee names. This is guidance, not legal advice.

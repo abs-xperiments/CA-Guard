@@ -6,10 +6,10 @@ makes is that a client's ledger stays on the machine, and an HTTP server is
 exactly where that claim is easiest to break by accident — so the bind address
 is checked rather than trusted.
 
-Findings are computed, not stored. A ledger is analysed once and the result is
-held in memory for the life of the process, keyed by the ledger's content hash:
-re-running the same book at the same version reproduces the same findings, so
-there is nothing to persist and nothing that can drift.
+Findings are computed, not stored: re-running the same book at the same version
+reproduces them exactly, so there is nothing that can drift. The uploaded file
+itself *is* kept (D-054), byte for byte, so an engagement re-opens from its own
+original after a restart — see `caguard.api.workspace`.
 """
 
 from __future__ import annotations
@@ -19,7 +19,6 @@ import logging
 import os
 import secrets
 import tempfile
-from dataclasses import dataclass, field
 from pathlib import Path
 
 import pandas as pd
@@ -37,25 +36,23 @@ from caguard.api.models import (
     IntakeReportOut,
     QueueOut,
 )
+from caguard.api.source_routes import build_source_router
+from caguard.api.workspace import Analysis, Workspace
 from caguard.auth import UserStore
 from caguard.auth.sessions import load_or_create_key
 from caguard.auth.users import User
 from caguard.detect.types import DetectorConfig
-from caguard.explain.ollama import OllamaProvider
-from caguard.explain.service import ExplanationService
-from caguard.intake.normalise import NormalisationError, NormalisationReport, normalise
+from caguard.intake.normalise import normalise
 from caguard.intake.readers import (
     MAX_UPLOAD_BYTES,
     SUPPORTED_SUFFIXES,
-    IntakeError,
     read_table,
     safe_suffix,
 )
 from caguard.review.decisions import Decision, ReviewAction
-from caguard.review.engagement import Engagement, open_engagement
-from caguard.review.finding import Finding, RiskBand
-from caguard.review.fusion import build_findings
+from caguard.review.finding import RiskBand
 from caguard.review.report import build_rows, to_csv, to_html
+from caguard.review.sources import SourceVault
 from caguard.review.store import ReviewStore
 
 #: Uploads are copied to disk in chunks of this size, so a large ledger is never
@@ -65,70 +62,6 @@ UPLOAD_CHUNK_BYTES = 1024 * 1024
 logger = logging.getLogger("caguard.api")
 
 
-@dataclass
-class Analysis:
-    """One analysed ledger, held for the life of the process."""
-
-    engagement: Engagement
-    lines: pd.DataFrame
-    findings: list[Finding]
-    intake: NormalisationReport | None = None
-
-    @property
-    def by_voucher(self) -> dict[str, Finding]:
-        return {finding.voucher_id: finding for finding in self.findings}
-
-
-@dataclass
-class Workspace:
-    """Shared state: the store on disk, and analyses held in memory."""
-
-    store: ReviewStore
-    config: DetectorConfig = field(default_factory=DetectorConfig)
-    model: str = "none"
-    analyses: dict[str, Analysis] = field(default_factory=dict)
-
-    def explanation_service(self) -> ExplanationService:
-        """A service for the configured model, or the deterministic path.
-
-        Built per request rather than held: the model may be started or stopped
-        while the workspace is open, and a reviewer should not have to restart
-        the application because Ollama came up.
-        """
-        if self.model == "none":
-            return ExplanationService()
-        return ExplanationService(OllamaProvider(model=self.model), timeout=60.0)
-
-    def model_available(self) -> bool:
-        if self.model == "none":
-            return False
-        return OllamaProvider(model=self.model).available()
-
-    def analyse(
-        self,
-        lines: pd.DataFrame,
-        source: str,
-        intake: NormalisationReport | None = None,
-    ) -> Analysis:
-        engagement = self.store.open_engagement(open_engagement(lines, source=source))
-        cached = self.analyses.get(engagement.id)
-        if cached is not None:
-            return cached
-        analysis = Analysis(engagement, lines, build_findings(lines, self.config), intake=intake)
-        self.analyses[engagement.id] = analysis
-        return analysis
-
-    def require(self, engagement_id: str) -> Analysis:
-        analysis = self.analyses.get(engagement_id)
-        if analysis is None:
-            raise HTTPException(
-                404,
-                f"Engagement {engagement_id!r} is not loaded. Upload its ledger again — "
-                "findings are recomputed rather than stored, so nothing is lost.",
-            )
-        return analysis
-
-
 def create_app(
     store_path: Path | str = "data/review.db",
     *,
@@ -136,10 +69,13 @@ def create_app(
     model: str = "none",
 ) -> FastAPI:
     """Build the application. Nothing is analysed until a ledger is uploaded."""
-    workspace = Workspace(
-        store=ReviewStore(store_path), config=config or DetectorConfig(), model=model
-    )
     data_dir = Path(store_path).parent
+    workspace = Workspace(
+        store=ReviewStore(store_path),
+        vault=SourceVault(data_dir / "sources"),
+        config=config or DetectorConfig(),
+        model=model,
+    )
     users = UserStore(store_path)
     signing_key = load_or_create_key(data_dir)
 
@@ -156,6 +92,7 @@ def create_app(
     # a signed-in user. Applied as a dependency rather than remembered per route,
     # because a route someone forgets to protect is the one that leaks.
     signed_in = Depends(current_user_dependency(users, signing_key))
+    app.include_router(build_source_router(workspace, signed_in))
 
     @app.get("/api/health")
     def health() -> dict[str, object]:
@@ -195,7 +132,9 @@ def create_app(
             # year's ledger. Run on the event loop, they froze the whole server
             # for every user until they finished (measured: 12 s for a health
             # check during a 13.5 s analysis).
-            analysis = await run_in_threadpool(_analyse_upload, workspace, temp, display_name)
+            analysis = await run_in_threadpool(
+                _ingest, workspace, temp, suffix, display_name, user.display_name
+            )
         finally:
             temp.unlink(missing_ok=True)
         return _queue(workspace, analysis)
@@ -214,7 +153,12 @@ def create_app(
         if found is None:
             raise HTTPException(404, f"No finding for voucher {voucher_id!r}")
         current = workspace.store.current(engagement_id).get(voucher_id)
-        return FindingOut.build(found, current)
+        return FindingOut.build(
+            found,
+            current,
+            lines=analysis.lines_for(voucher_id),
+            source=analysis.source,
+        )
 
     @app.get(
         "/api/engagements/{engagement_id}/findings/{voucher_id}/explanation",
@@ -315,38 +259,26 @@ async def _receive(file: UploadFile, directory: Path, suffix: str, display_name:
     return path
 
 
-def _analyse_upload(workspace: Workspace, path: Path, display_name: str) -> Analysis:
-    """Read, normalise and analyse one uploaded file. Runs in a worker thread.
+def _ingest(
+    workspace: Workspace, path: Path, suffix: str, display_name: str, uploaded_by: str
+) -> Analysis:
+    """Analyse and keep one upload, turning any failure into a message to act on.
 
-    Every failure becomes a message the reviewer can act on. Anything unexpected
-    is logged with an error id the reviewer can quote, and the message says what
-    did not happen rather than showing an internal exception.
+    Expected problems (an unreadable file, missing columns) arrive as
+    HTTPExceptions with their own wording. Anything else is logged with an
+    error id the reviewer can quote, and the message says what did not happen
+    rather than showing an internal exception.
     """
     try:
-        raw = read_table(path, display_name=display_name)
-    except IntakeError as exc:
-        raise HTTPException(400, str(exc)) from exc
-
-    # A real ledger does not arrive in our schema. Map it, derive what can be
-    # derived, and say plainly what the file did not contain.
-    try:
-        normalised = normalise(raw)
-    except NormalisationError as exc:
-        raise HTTPException(400, f"{display_name}: {exc}") from exc
-
-    try:
-        return workspace.analyse(normalised.lines, source=display_name, intake=normalised.report)
+        return workspace.ingest(path, suffix, display_name, uploaded_by)
+    except HTTPException:
+        raise
     except Exception as exc:
         error_id = secrets.token_hex(4)
         # Metadata only. Not the traceback: exception text from the data layer can
         # quote cell values, and a log file must never become a copy of a ledger.
         # The failure reproduces locally with `caguard review <file>`.
-        logger.error(
-            "analysis failed error_id=%s error_type=%s rows=%d",
-            error_id,
-            type(exc).__name__,
-            len(normalised.lines),
-        )
+        logger.error("analysis failed error_id=%s error_type=%s", error_id, type(exc).__name__)
         raise HTTPException(
             500,
             f"{display_name} was read and its columns were recognised, but the analysis "

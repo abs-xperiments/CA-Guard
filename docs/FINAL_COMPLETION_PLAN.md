@@ -1,6 +1,6 @@
 # CA-Guard — Final Completion Plan
 
-**Audit date:** 2026-10-07 21:10 IST · **Baseline commit:** `695e904` · **Status:** Phase 1 ✅ done (2026-10-07 21:55 IST); Phase 2 next
+**Audit date:** 2026-10-07 21:10 IST · **Baseline commit:** `695e904` · **Status:** Phases 1–2 ✅ done (2026-10-07 22:50 IST); Phase 3 next
 
 This plan comes from a full re-sync with the repository. That meant reading the code, docs, ADRs and journal, then actually *running* the product: the CLI, the API, the Next.js workspace in a browser, and the benchmark. Every defect below was reproduced, not inferred. Where something was not verified, it says so.
 
@@ -209,7 +209,20 @@ Phases 1–8 need no founder input except where marked.
 - the `Secure` cookie is set behind an HTTPS proxy (tested);
 - the 6th rapid failed login is throttled.
 
-### Phase 2 — Source documents and traceability (§4.3) — *retention behaviour per FD-2*
+### Phase 2 — Source documents and traceability (§4.3) — ✅ done 2026-10-07 22:50 IST
+
+**How the criteria were met:**
+- Byte-identical download for CSV, XLSX, XLS and Parquet (tests), and through the real workspace proxy (sha256 compared by hand).
+- Restart re-opens with identical findings and decisions intact (tests).
+- Every finding line carries its `source_row`. The preview highlights that row, and openpyxl independently confirms the numbering. Row numbers survive blank lines (tests).
+- The v1→v2 migration keeps decisions (tests); a newer schema is refused.
+- Delete removes the bytes from disk and keeps the record and trail. It is admin-only.
+- Hostile filenames never reach a path or a header.
+- The preview is JSON rendered as table text.
+
+Also delivered here, ahead of Phase 3: the finding drawer shows the transaction itself (account names, Dr/Cr, narration, document ref, preparer, approver, entry time, voucher type).
+
+Fixed along the way: workspace keyboard shortcuts now pause while any dialog is open. Before, a stray `a` behind a dialog could record a decision.
 **Acceptance:**
 - the downloaded original is **byte-identical** to the upload (sha256 asserted in tests, for CSV, XLSX and Parquet);
 - after a restart, an engagement opens without re-uploading and produces identical findings;

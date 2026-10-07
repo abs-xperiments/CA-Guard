@@ -122,8 +122,8 @@ export default function Home() {
           Drop a ledger here, or choose a file
         </p>
         <p className="mt-1 text-[13px] text-ink-muted">
-          CSV, Excel or Parquet. Nothing is uploaded anywhere — it is read on this
-          machine.
+          CSV, Excel or Parquet. The file stays on the computer running CA-Guard, kept
+          exactly as uploaded so you can download it again.
         </p>
         <div className="mt-5 flex justify-center">
           {uploading ? (

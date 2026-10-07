@@ -96,10 +96,11 @@
     animation: shimmer 1.4s infinite;
   }
   .animate-row    { animation: fade-up 140ms ease-out both; }
+  .animate-fade-up { animation: fade-up 160ms ease-out both; }
   .animate-pulse-soft { animation: pulse-soft 1.4s ease-in-out infinite; }
 
   @media (prefers-reduced-motion: reduce) {
-    .animate-drawer, .animate-row, .animate-pulse-soft,
+    .animate-drawer, .animate-row, .animate-pulse-soft, .animate-fade-up,
     .animate-toast, .animate-toast-out, .animate-confirm { animation: none; }
     .animate-shimmer::after { animation: none; }
   }

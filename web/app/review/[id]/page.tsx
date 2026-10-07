@@ -18,15 +18,16 @@
 import { use, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Download, Inbox, LogOut, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Download, FileSpreadsheet, Inbox, LogOut, ShieldCheck } from "lucide-react";
 import { ApiError, api, auth } from "@/lib/api";
 import type { Decision, Finding, Queue, RiskBand, User } from "@/lib/types";
 import { EvidenceDrawer } from "@/components/EvidenceDrawer";
 import { FindingsTable } from "@/components/FindingsTable";
 import { IntakeNotice } from "@/components/IntakeNotice";
 import { QueueSkeleton } from "@/components/Skeleton";
+import { SourcesPanel } from "@/components/SourcesPanel";
 import { useToast } from "@/components/Toast";
-import { Button, EmptyState, ErrorState, Key, Stat, cx } from "@/components/ui";
+import { Button, EmptyState, ErrorState, Key, Stat, cx, shortcutBlocked } from "@/components/ui";
 
 type BandFilter = RiskBand | "all";
 type StatusFilter = "all" | "open" | "reviewed";
@@ -49,6 +50,10 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
   //: Vouchers decided moments ago. Kept in the list briefly so the decision is
   //: visibly acknowledged before the row leaves.
   const [settling, setSettling] = useState<Set<string>>(new Set());
+  const [showSources, setShowSources] = useState(false);
+  // 409: the engagement exists but cannot be rebuilt (its file was deleted, or
+  // it predates stored originals). Retrying cannot help; re-uploading can.
+  const [needsLedger, setNeedsLedger] = useState(false);
 
   const load = useCallback(async () => {
     setError(null);
@@ -61,6 +66,7 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
     try {
       setQueue(await api.queue(id));
     } catch (caught) {
+      setNeedsLedger(caught instanceof ApiError && caught.status === 409);
       setError(caught instanceof ApiError ? caught.message : "Could not load the review.");
     }
   }, [id, router]);
@@ -141,9 +147,7 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
   // handled there, so a keystroke is never claimed twice.
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
-      const target = event.target as HTMLElement | null;
-      if (target && ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName)) return;
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      if (shortcutBlocked(event)) return;
 
       if (event.key === "Escape") {
         setSelected(null);
@@ -164,6 +168,23 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
   async function signOut() {
     await auth.logout().catch(() => undefined);
     router.replace("/login");
+  }
+
+  if (error && needsLedger) {
+    return (
+      <main className="mx-auto max-w-2xl px-6 py-16">
+        <EmptyState
+          icon={<FileSpreadsheet size={28} />}
+          title="This review needs its ledger again"
+          detail={error}
+          action={
+            <Link href="/">
+              <Button variant="primary">Upload the ledger</Button>
+            </Link>
+          }
+        />
+      </main>
+    );
   }
 
   if (error) {
@@ -229,6 +250,9 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
             />
           </dl>
 
+          <Button onClick={() => setShowSources(true)} title="The files this review was built from">
+            <FileSpreadsheet size={14} /> Source
+          </Button>
           <a href={api.reportUrl(id, "html")} target="_blank" rel="noreferrer">
             <Button title="Open the review report">
               <Download size={14} /> Report
@@ -350,6 +374,14 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
           />
         ) : null}
       </div>
+
+      {showSources ? (
+        <SourcesPanel
+          engagementId={id}
+          canDelete={user?.is_admin ?? false}
+          onClose={() => setShowSources(false)}
+        />
+      ) : null}
     </div>
   );
 }

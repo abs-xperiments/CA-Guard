@@ -36,6 +36,61 @@ export interface Finding {
   status: string;
   reviewer: string | null;
   note: string | null;
+  /** The transaction itself. Present on a single finding, empty in the queue. */
+  lines: LedgerLine[];
+  source: SourceRef | null;
+}
+
+/** One ledger line behind a finding, and where it sits in the uploaded file. */
+export interface LedgerLine {
+  line_id: string;
+  line_number: number | null;
+  account_code: string;
+  account_name: string;
+  debit_paise: number;
+  credit_paise: number;
+  debit_display: string;
+  credit_display: string;
+  narration: string | null;
+  document_ref: string | null;
+  voucher_type: string | null;
+  cost_centre: string | null;
+  created_by: string | null;
+  approved_by: string | null;
+  posted_at: string | null;
+  /** Row in the original file, numbered as a spreadsheet shows it (header = 1). */
+  source_row: number | null;
+}
+
+export interface SourceRef {
+  id: string;
+  filename: string;
+}
+
+/** An uploaded file, exactly as it was received. */
+export interface SourceFile {
+  id: string;
+  engagement_id: string;
+  filename: string;
+  file_type: string;
+  size_bytes: number;
+  sha256: string;
+  uploaded_at: string;
+  uploaded_by: string;
+  rows_read: number;
+  rows_used: number;
+  available: boolean;
+  deleted_at: string | null;
+  deleted_by: string | null;
+}
+
+export interface SourcePreview {
+  source_id: string;
+  filename: string;
+  columns: string[];
+  rows: { row: number; values: (string | null)[] }[];
+  total_rows: number;
+  offset: number;
 }
 
 export interface Engagement {
@@ -124,6 +179,26 @@ export const CONCERN_LABELS: Record<string, string> = {
 
 export function concernLabel(kind: string): string {
   return CONCERN_LABELS[kind] ?? kind.replace(/_/g, " ");
+}
+
+/** 1536 → "1.5 KB". Sizes a reviewer can compare at a glance. */
+export function fileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/** An ISO timestamp as an Indian reader writes it: 07-10-2026, 21:40. */
+export function whenIST(iso: string): string {
+  return new Date(iso).toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Kolkata",
+  });
 }
 
 /** 2025-03-31 → 31-03-2025, the order an Indian reader expects. */

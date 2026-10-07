@@ -184,7 +184,7 @@ def test_report_exports_cover_every_finding(client: TestClient, opened: dict) ->
 def test_an_unknown_engagement_explains_itself(client: TestClient) -> None:
     response = client.get("/api/engagements/nope/queue")
     assert response.status_code == 404
-    assert "recomputed rather than stored" in response.json()["detail"]
+    assert "no such engagement" in response.json()["detail"]
 
 
 def test_an_unknown_voucher_is_a_404(client: TestClient, opened: dict) -> None:

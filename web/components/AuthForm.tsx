@@ -43,8 +43,8 @@ export function AuthShell({
         <p className="mt-5 text-center text-[13px] text-ink-muted">{footer}</p>
 
         <p className="mt-6 text-center text-[12px] leading-relaxed text-ink-faint">
-          Ledgers are read on this machine and are not sent anywhere. Your account
-          exists only on this installation.
+          Ledgers stay on the computer running CA-Guard and are never sent to an outside
+          service. Your account exists only on this installation.
         </p>
       </div>
     </main>

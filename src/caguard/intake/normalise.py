@@ -128,11 +128,18 @@ def normalise(frame: pd.DataFrame, *, overrides: dict[str, str] | None = None) -
     if frame.empty:
         raise NormalisationError("The file contains no rows.")
 
+    # The reader keeps blank lines so that row numbers match what Excel shows.
+    # Drop them here, keeping the original index, which is what source_row uses.
+    frame = frame.dropna(how="all")
+    if frame.empty:
+        raise NormalisationError("The file contains no rows.")
+
     # A file already in canonical shape passes through with only typing applied.
     if _is_canonical(frame):
         from caguard.intake.coerce import to_canonical_types
 
         typed = to_canonical_types(frame)
+        typed["source_row"] = _source_rows(frame.index)
         report = NormalisationReport(
             mapped={column: column for column in frame.columns},
             rows_in=len(frame),
@@ -154,6 +161,7 @@ def normalise(frame: pd.DataFrame, *, overrides: dict[str, str] | None = None) -
 
     renamed = frame.rename(columns=mapping.resolved)
     out = pd.DataFrame(index=renamed.index)
+    out["source_row"] = _source_rows(renamed.index)
 
     _carry_text(renamed, out, report)
     _amounts(renamed, out, report)
@@ -174,6 +182,20 @@ def normalise(frame: pd.DataFrame, *, overrides: dict[str, str] | None = None) -
 
 
 # --- steps -------------------------------------------------------------------
+
+
+#: The spreadsheet row of the first data record: row 1 is the header.
+FIRST_DATA_ROW = 2
+
+
+def _source_rows(index: pd.Index) -> pd.Series:
+    """Each line's row in the original file, as a spreadsheet would number it.
+
+    This is what lets a finding be traced to "ledger.xlsx, row 1,842" — the
+    question a reviewer actually asks, and the one a regenerated file cannot
+    answer.
+    """
+    return pd.Series(index.to_numpy() + FIRST_DATA_ROW, index=index, dtype="int64")
 
 
 def _is_canonical(frame: pd.DataFrame) -> bool:

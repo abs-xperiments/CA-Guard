@@ -13,6 +13,8 @@ import type {
   Queue,
   ReviewAction,
   SignupState,
+  SourceFile,
+  SourcePreview,
   User,
 } from "./types";
 
@@ -114,4 +116,18 @@ export const api = {
 
   reportUrl: (id: string, format: "csv" | "html") =>
     `/api/engagements/${id}/report.${format}`,
+
+  sources: (id: string) => request<SourceFile[]>(`/api/engagements/${id}/sources`),
+
+  /** The exact uploaded bytes. A plain link, so the browser handles the download. */
+  originalUrl: (id: string, sourceId: string) =>
+    `/api/engagements/${id}/sources/${sourceId}/original`,
+
+  preview: (id: string, sourceId: string, offset: number, limit = 50) =>
+    request<SourcePreview>(
+      `/api/engagements/${id}/sources/${sourceId}/preview?offset=${offset}&limit=${limit}`,
+    ),
+
+  deleteSource: (id: string, sourceId: string) =>
+    request<SourceFile>(`/api/engagements/${id}/sources/${sourceId}`, { method: "DELETE" }),
 };

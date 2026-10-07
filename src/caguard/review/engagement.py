@@ -39,13 +39,20 @@ class Engagement(BaseModel):
         return ledger_hash(lines) == self.content_sha256
 
 
+#: Columns recording where a line came from, excluded from the content hash.
+PROVENANCE_COLUMNS: frozenset[str] = frozenset({"source_row"})
+
+
 def ledger_hash(lines: pd.DataFrame) -> str:
     """A stable hash of a ledger's content.
 
     Deliberately over the values rather than the file: the same ledger saved as
     CSV and as parquet is the same book, and should open the same engagement.
+    Provenance columns describe where a line sat in a file, not what the book
+    says, so they are left out — otherwise adding one would re-key every
+    engagement and orphan its decisions.
     """
-    columns = sorted(lines.columns)
+    columns = sorted(c for c in lines.columns if c not in PROVENANCE_COLUMNS)
     ordered = lines.loc[:, columns]
 
     # Sort by something unique. Sorting on the first couple of columns leaves
