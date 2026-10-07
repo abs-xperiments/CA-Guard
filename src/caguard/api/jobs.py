@@ -21,6 +21,7 @@ from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from enum import StrEnum
+from typing import TypeVar
 
 from fastapi import HTTPException
 
@@ -40,7 +41,17 @@ STAGE_KEYS = tuple(key for key, _ in STAGES)
 #: Finished jobs are forgotten after this long; the engagement itself remains.
 KEEP_FINISHED_SECONDS = 60 * 60
 
+#: Analyses one account may have queued or running at once. Each holds an
+#: upload of up to 200 MB on disk and, once running, the ledger in memory.
+MAX_IN_FLIGHT_PER_ACCOUNT = 2
+
+
+class TooBusyError(RuntimeError):
+    """This account already has as many analyses in progress as it may."""
+
+
 Progress = Callable[[str], None]
+T = TypeVar("T")
 
 
 class JobState(StrEnum):
@@ -73,6 +84,7 @@ class JobRunner:
     def __init__(self, workers: int = 2) -> None:
         self._pool = ThreadPoolExecutor(max_workers=workers, thread_name_prefix="caguard-job")
         self._jobs: dict[str, Job] = {}
+        self._in_flight: dict[str, int] = {}
         self._lock = threading.Lock()
 
     def submit(self, owner_id: str, work: Callable[[Progress], str]) -> Job:
@@ -80,9 +92,33 @@ class JobRunner:
         job = Job(id=secrets.token_hex(8), owner_id=owner_id)
         with self._lock:
             self._prune()
+            self._claim(owner_id)
             self._jobs[job.id] = job
         self._pool.submit(self._run, job, work)
         return job
+
+    def run(self, owner_id: str, work: Callable[[], T]) -> T:
+        """Run ``work`` on the same bounded pool and wait for it.
+
+        For the one-request upload kept for scripts: it shares the pool and the
+        per-account limit, so it cannot be used to sidestep either.
+        """
+        with self._lock:
+            self._claim(owner_id)
+        try:
+            return self._pool.submit(work).result()
+        finally:
+            with self._lock:
+                self._in_flight[owner_id] -= 1
+
+    def _claim(self, owner_id: str) -> None:
+        """Count one more analysis for this account, or refuse. Caller holds the lock."""
+        if self._in_flight.get(owner_id, 0) >= MAX_IN_FLIGHT_PER_ACCOUNT:
+            raise TooBusyError(
+                "Two ledgers are already being analysed for this account. Wait for one to "
+                "finish, then upload again."
+            )
+        self._in_flight[owner_id] = self._in_flight.get(owner_id, 0) + 1
 
     def get(self, job_id: str, owner_id: str) -> Job | None:
         """A job, but only for the account that started it."""
@@ -123,6 +159,8 @@ class JobRunner:
             job.state = JobState.FAILED
         finally:
             job.finished = time.monotonic()
+            with self._lock:
+                self._in_flight[job.owner_id] -= 1
 
     def _prune(self) -> None:
         now = time.monotonic()

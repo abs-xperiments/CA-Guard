@@ -44,7 +44,7 @@ export default function LoginPage() {
         </>
       }
     >
-      <form onSubmit={submit}>
+      <form method="post" onSubmit={submit}>
         {error ? <FormError message={error} /> : null}
         <Field
           label="Email"

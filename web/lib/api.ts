@@ -86,7 +86,7 @@ export const api = {
   engagements: () => request<EngagementSummary[]>("/api/engagements"),
 
   rename: (id: string, name: string) =>
-    request<Engagement>(`/api/engagements/${id}`, {
+    request<Engagement>(`/api/engagements/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ name }),
@@ -133,15 +133,15 @@ export const api = {
       xhr.send(form);
     }),
 
-  job: (id: string) => request<UploadJob>(`/api/jobs/${id}`),
+  job: (id: string) => request<UploadJob>(`/api/jobs/${encodeURIComponent(id)}`),
 
-  queue: (id: string) => request<Queue>(`/api/engagements/${id}/queue`),
+  queue: (id: string) => request<Queue>(`/api/engagements/${encodeURIComponent(id)}/queue`),
 
   finding: (id: string, voucher: string) =>
-    request<Finding>(`/api/engagements/${id}/findings/${voucher}`),
+    request<Finding>(`/api/engagements/${encodeURIComponent(id)}/findings/${encodeURIComponent(voucher)}`),
 
   explanation: (id: string, voucher: string) =>
-    request<Explanation>(`/api/engagements/${id}/findings/${voucher}/explanation`),
+    request<Explanation>(`/api/engagements/${encodeURIComponent(id)}/findings/${encodeURIComponent(voucher)}/explanation`),
 
   decide: (
     id: string,
@@ -149,7 +149,7 @@ export const api = {
     // decision cannot be attributed to somebody who did not make it.
     payload: { voucher_id: string; action: ReviewAction; note?: string },
   ) =>
-    request<Decision>(`/api/engagements/${id}/decisions`, {
+    request<Decision>(`/api/engagements/${encodeURIComponent(id)}/decisions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
@@ -157,23 +157,23 @@ export const api = {
 
   trail: (id: string, voucher?: string) =>
     request<Decision[]>(
-      `/api/engagements/${id}/trail${voucher ? `?voucher_id=${voucher}` : ""}`,
+      `/api/engagements/${encodeURIComponent(id)}/trail${voucher ? `?voucher_id=${voucher}` : ""}`,
     ),
 
   reportUrl: (id: string, format: "csv" | "html") =>
-    `/api/engagements/${id}/report.${format}`,
+    `/api/engagements/${encodeURIComponent(id)}/report.${format}`,
 
-  sources: (id: string) => request<SourceFile[]>(`/api/engagements/${id}/sources`),
+  sources: (id: string) => request<SourceFile[]>(`/api/engagements/${encodeURIComponent(id)}/sources`),
 
   /** The exact uploaded bytes. A plain link, so the browser handles the download. */
   originalUrl: (id: string, sourceId: string) =>
-    `/api/engagements/${id}/sources/${sourceId}/original`,
+    `/api/engagements/${encodeURIComponent(id)}/sources/${encodeURIComponent(sourceId)}/original`,
 
   preview: (id: string, sourceId: string, offset: number, limit = 50) =>
     request<SourcePreview>(
-      `/api/engagements/${id}/sources/${sourceId}/preview?offset=${offset}&limit=${limit}`,
+      `/api/engagements/${encodeURIComponent(id)}/sources/${encodeURIComponent(sourceId)}/preview?offset=${offset}&limit=${limit}`,
     ),
 
   deleteSource: (id: string, sourceId: string) =>
-    request<SourceFile>(`/api/engagements/${id}/sources/${sourceId}`, { method: "DELETE" }),
+    request<SourceFile>(`/api/engagements/${encodeURIComponent(id)}/sources/${encodeURIComponent(sourceId)}`, { method: "DELETE" }),
 };

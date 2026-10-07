@@ -311,7 +311,16 @@ Fixed along the way: workspace keyboard shortcuts now pause while any dialog is 
 - logs record durations and counts for every stage;
 - a test proves ledger contents never reach the log file.
 
-### Phase 6 — Security and privacy review (§4.6)
+### Phase 6 — Security and privacy review (§4.6) — ✅ done 2026-10-07 23:55 IST
+
+**How the criteria were met:**
+- **Threat model and data lifecycle** written for both deployments (`08_SECURITY_PRIVACY.md`).
+- **Headers:** a CSP with `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy`, HSTS and `Permissions-Policy` on the workspace, checked by the smoke test. The API sends the same baseline plus `Cache-Control: no-store`. The HTML report runs under `default-src 'none'`.
+- **Privacy wording:** every "this machine" claim is corrected so it is true on both deployments.
+- **Hostile files:** probes showed entity bombs were already refused (pinned by a test) and zip bombs were not (fixed).
+- **Independent review:** no authentication bypass or cross-engagement access found; 9 findings fixed, with the residuals recorded in `08_SECURITY_PRIVACY.md`.
+- **Also fixed:** vouchers numbered like "JV/2024/117" could not be opened; auth forms lacked names (password managers) and could GET-submit before hydration.
+- **The smoke script** had silently tested a stale server holding its port. It now refuses busy ports, and it runs in CI.
 **Acceptance:**
 - a written threat model and data-lifecycle table in `08_SECURITY_PRIVACY.md`;
 - CSP and security headers verified in responses;

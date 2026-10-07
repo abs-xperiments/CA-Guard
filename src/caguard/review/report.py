@@ -107,7 +107,34 @@ def to_frame(rows: list[ReportRow]) -> pd.DataFrame:
 
 
 def to_csv(rows: list[ReportRow]) -> str:
-    return to_frame(rows).to_csv(index=False)
+    """The report as CSV, safe to open in Excel.
+
+    Every text cell that a spreadsheet would treat as a formula is neutralised.
+    The cells come from a client's ledger (voucher numbers, narrations), from
+    reviewers (notes) and from account holders (display names) — any of which
+    could otherwise plant ``=HYPERLINK(...)`` or DDE that runs when a CA opens
+    the export.
+    """
+    frame = to_frame(rows)
+    for column in frame.columns:
+        # pandas 3 stores text in its own string dtype, not ``object``; test
+        # for both, or the check silently matches nothing.
+        if frame[column].dtype == object or pd.api.types.is_string_dtype(frame[column]):
+            frame[column] = frame[column].map(neutralise_formula)
+    return frame.to_csv(index=False)
+
+
+#: Characters that make a spreadsheet read a cell as a formula (OWASP CSV injection).
+_FORMULA_TRIGGERS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def neutralise_formula(value: object) -> object:
+    """Prefix an apostrophe to text a spreadsheet would execute; leave the rest."""
+    if not isinstance(value, str):
+        return value
+    if value.startswith(("\t", "\r")) or value.lstrip().startswith(_FORMULA_TRIGGERS):
+        return "'" + value
+    return value
 
 
 def to_html(

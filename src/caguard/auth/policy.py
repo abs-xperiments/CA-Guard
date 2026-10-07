@@ -22,6 +22,22 @@ from pathlib import Path
 INVITE_ENV = "CAGUARD_INVITE_CODE"
 INVITE_FILENAME = "invite.code"
 
+#: A configured invite code is the only thing between the public demo and a new
+#: account, and it is tried online. Sixteen characters of the kind a password
+#: generator makes is out of reach; a word someone chose is not.
+MIN_CONFIGURED_INVITE = 16
+
+
+def check_configured_invite() -> None:
+    """Refuse to start with a configured invite code too short to resist guessing."""
+    configured = os.environ.get(INVITE_ENV, "").strip()
+    if configured and len(configured) < MIN_CONFIGURED_INVITE:
+        raise RuntimeError(
+            f"{INVITE_ENV} is {len(configured)} characters; at least "
+            f"{MIN_CONFIGURED_INVITE} are required. Generate one with: "
+            'python -c "import secrets; print(secrets.token_urlsafe(18))"'
+        )
+
 
 class SignupState(StrEnum):
     #: No accounts yet. The first person to sign up becomes the administrator.
@@ -96,6 +112,8 @@ def _local_invite_code(data_dir: Path) -> str:
         return path.read_text().strip()
 
     code = secrets.token_urlsafe(9)
-    path.write_text(code)
-    path.chmod(0o600)
+    # Owner-only from the moment it exists, rather than chmodded after writing.
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "w") as handle:
+        handle.write(code)
     return code

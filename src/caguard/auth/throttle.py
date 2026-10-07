@@ -12,6 +12,7 @@ forgetting the counts is an acceptable trade for not running Redis.
 
 from __future__ import annotations
 
+import hashlib
 import threading
 import time
 from collections.abc import Callable
@@ -22,6 +23,11 @@ MAX_FAILURES = 5
 
 #: How long failures are remembered, and how long a locked account waits.
 WINDOW_SECONDS = 15 * 60
+
+#: Expired entries are swept once more than this many accounts are tracked,
+#: and no more than MAX_TRACKED are ever kept.
+SWEEP_ABOVE = 1_000
+MAX_TRACKED = 10_000
 
 
 @dataclass
@@ -44,7 +50,25 @@ class LoginThrottle:
 
     def failed(self, account: str) -> None:
         with self._lock:
-            self._recent(account).append(self.clock())
+            recent = self._recent(account)
+            recent.append(self.clock())
+            self._failures[_key(account)] = recent
+            if len(self._failures) > SWEEP_ABOVE:
+                self._sweep()
+
+    def _sweep(self) -> None:
+        """Forget every account whose failures have all expired.
+
+        Without this, counts for addresses never tried again stayed forever, and
+        an anonymous caller could grow the server's memory one address at a time.
+        """
+        cutoff = self.clock() - self.window_seconds
+        for key in [k for k, times in self._failures.items() if not times or times[-1] <= cutoff]:
+            del self._failures[key]
+        # Still too many live entries means a flood: keep the most recent.
+        if len(self._failures) > MAX_TRACKED:
+            newest = sorted(self._failures.items(), key=lambda item: item[1][-1])[-MAX_TRACKED:]
+            self._failures = dict(newest)
 
     def succeeded(self, account: str) -> None:
         with self._lock:
@@ -54,9 +78,15 @@ class LoginThrottle:
         cutoff = self.clock() - self.window_seconds
         key = _key(account)
         recent = [t for t in self._failures.get(key, []) if t > cutoff]
-        self._failures[key] = recent
+        # Only accounts with live failures are kept: merely checking an address
+        # must not leave an entry behind.
+        if recent:
+            self._failures[key] = recent
+        else:
+            self._failures.pop(key, None)
         return recent
 
 
 def _key(account: str) -> str:
-    return account.strip().lower()
+    # Hashed, so a key costs the same 64 characters whatever was submitted.
+    return hashlib.sha256(account.strip().lower().encode()).hexdigest()

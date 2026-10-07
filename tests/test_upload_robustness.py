@@ -201,7 +201,9 @@ def test_simultaneous_uploads_of_different_ledgers_stay_separate(client: TestCli
         f"client{seed}.csv": _csv(
             generate(GeneratorConfig(seed=seed, n_vouchers=250)).lines, "utf-8"
         )
-        for seed in (404, 405, 406)
+        # Two: the most one account may have in flight (the limit is pinned in
+        # test_a_third_concurrent_analysis_is_refused_politely).
+        for seed in (404, 405)
     }
     results: dict[str, dict] = {}
 
@@ -217,7 +219,7 @@ def test_simultaneous_uploads_of_different_ledgers_stay_separate(client: TestCli
         thread.join()
 
     assert set(results) == set(books)
-    assert len({r["engagement"]["id"] for r in results.values()}) == 3
+    assert len({r["engagement"]["id"] for r in results.values()}) == 2
     for name, result in results.items():
         assert result["engagement"]["source_name"] == name
 
@@ -246,3 +248,29 @@ def test_a_failure_log_never_contains_ledger_values(
     assert response.status_code == 500
     assert "analysis.failed" in caplog.text
     assert marker not in caplog.text
+
+
+def test_a_third_concurrent_analysis_is_refused_politely(
+    client: TestClient, ledger: pd.DataFrame, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """One account may not tie up every worker, through either upload route."""
+    release = threading.Event()
+    real = workspace_module.build_findings
+
+    def held(*args, **kwargs):
+        release.wait(timeout=30)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(workspace_module, "build_findings", held)
+    payload = _csv(ledger, "utf-8")
+    first = client.post("/api/uploads", files={"file": ("a.csv", payload, "text/csv")})
+    second = client.post("/api/uploads", files={"file": ("b.csv", payload, "text/csv")})
+    assert first.status_code == second.status_code == 202
+
+    third_job = client.post("/api/uploads", files={"file": ("c.csv", payload, "text/csv")})
+    third_sync = _upload(client, "d.csv", payload)
+    release.set()
+
+    for response in (third_job, third_sync):
+        assert response.status_code == 429
+        assert "already being analysed" in response.json()["detail"]

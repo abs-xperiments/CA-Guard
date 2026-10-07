@@ -12,11 +12,13 @@ has exactly one file to back up.
 from __future__ import annotations
 
 import re
+import secrets
 import sqlite3
 import uuid
 from contextlib import closing
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from functools import lru_cache
 from pathlib import Path
 
 from caguard.auth.passwords import hash_password, verify_password
@@ -46,6 +48,7 @@ class User:
     name: str
     is_admin: bool
     created_at: datetime
+    session_epoch: int = 0
 
     @property
     def display_name(self) -> str:
@@ -60,6 +63,12 @@ class UserStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.executescript(_SCHEMA)
+            columns = {row["name"] for row in connection.execute("PRAGMA table_info(users)")}
+            if "session_epoch" not in columns:
+                # Added 2026-10-07: lets signing out end every copy of a session.
+                connection.execute(
+                    "ALTER TABLE users ADD COLUMN session_epoch INTEGER NOT NULL DEFAULT 0"
+                )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.path, isolation_level=None)
@@ -141,14 +150,28 @@ class UserStore:
         user = self.by_email(_clean_email(email))
         stored = self._password_hash(user.id) if user else None
 
-        if user is None or stored is None or not verify_password(password, stored):
+        # Always pay for one password check. Skipping it for unknown addresses
+        # made those answers twenty times faster — enough to tell, by timing
+        # alone, which addresses have accounts.
+        matched = verify_password(password, stored or _dummy_hash())
+        if user is None or stored is None or not matched:
             raise AuthError("That email address and password do not match.")
         return user
 
-    def set_password(self, user_id: str, password: str) -> None:
+    def end_sessions(self, user_id: str) -> None:
+        """Sign this account out everywhere: every session issued so far stops working."""
         with self._connect() as connection:
             connection.execute(
-                "UPDATE users SET password_hash = ? WHERE id = ?",
+                "UPDATE users SET session_epoch = session_epoch + 1 WHERE id = ?", (user_id,)
+            )
+
+    def set_password(self, user_id: str, password: str) -> None:
+        with self._connect() as connection:
+            # A new password ends every existing session, so a stolen cookie
+            # does not outlive the password it was taken under.
+            connection.execute(
+                "UPDATE users SET password_hash = ?, session_epoch = session_epoch + 1 "
+                "WHERE id = ?",
                 (hash_password(password), user_id),
             )
 
@@ -174,4 +197,11 @@ def _user_from(row: sqlite3.Row) -> User:
         name=row["name"],
         is_admin=bool(row["is_admin"]),
         created_at=datetime.fromisoformat(row["created_at"]),
+        session_epoch=int(row["session_epoch"] or 0),
     )
+
+
+@lru_cache(maxsize=1)
+def _dummy_hash() -> str:
+    """A real hash of nothing in particular, checked when an address is unknown."""
+    return hash_password(secrets.token_urlsafe(24))

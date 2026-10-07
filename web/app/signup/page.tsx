@@ -71,7 +71,7 @@ export default function SignupPage() {
       {state === null && !error ? (
         <Spinner label="Checking this installation…" />
       ) : (
-        <form onSubmit={submit}>
+        <form method="post" onSubmit={submit}>
           {error ? <FormError message={error} /> : null}
 
           {state?.state === "bootstrap" ? (

@@ -8,13 +8,28 @@ them is a visible decision.
 
 from __future__ import annotations
 
+import zipfile
 from pathlib import Path
 
 import pandas as pd
 
 MAX_UPLOAD_BYTES = 200 * 1024 * 1024
 MAX_ROWS = 2_000_000
+
+#: An .xlsx is a zip of XML. A small file can declare gigabytes of worksheet
+#: once unpacked — a "zip bomb" — and the row limit is only checked after
+#: parsing, by which point the memory is gone. The zip's own directory states
+#: each part's unpacked size, so this is checked before anything is opened.
+#: A genuine 200 MB workbook unpacks to well under this.
+MAX_UNPACKED_BYTES = 1024 * 1024 * 1024
 SUPPORTED_SUFFIXES = frozenset({".csv", ".xlsx", ".xls", ".parquet"})
+
+#: What the workspace accepts from a browser. Parquet is readable from the
+#: command line (generated ledgers, the benchmark) but not uploadable: no CA
+#: tool exports it, and its compressed columns can decode to hundreds of times
+#: the file size with no reliable size declared in advance — measured: 21 KB
+#: declared, 200 MB decoded.
+UPLOAD_SUFFIXES = frozenset({".csv", ".xlsx", ".xls"})
 
 
 class IntakeError(ValueError):
@@ -30,7 +45,7 @@ def safe_suffix(filename: str | None) -> str:
     the suffix is matched against what we support rather than trusted.
     """
     candidate = Path(filename or "").suffix.lower()
-    return candidate if candidate in SUPPORTED_SUFFIXES else ""
+    return candidate if candidate in UPLOAD_SUFFIXES else ""
 
 
 #: Encodings tried, in order, for a CSV that is not valid UTF-8. Excel on
@@ -75,6 +90,11 @@ def read_table(
             f"{MAX_UPLOAD_BYTES // 1024 // 1024} MB limit. Nothing was saved."
         )
 
+    if suffix == ".xlsx":
+        _check_unpacked_size(path, name)
+    elif suffix == ".parquet":
+        _check_parquet_size(path, name)
+
     encoding: str | None = None
     try:
         if suffix == ".csv":
@@ -105,6 +125,45 @@ def read_table(
         # Recorded so the intake notice can say how the file was decoded.
         frame.attrs["encoding"] = encoding
     return frame
+
+
+def _check_unpacked_size(path: Path, name: str) -> None:
+    """Refuse a workbook whose contents would unpack to more than the limit."""
+    try:
+        with zipfile.ZipFile(path) as archive:
+            unpacked = sum(info.file_size for info in archive.infolist())
+    except zipfile.BadZipFile as exc:
+        raise IntakeError(
+            f"{name} could not be read as an Excel workbook: it is not a valid .xlsx file. "
+            "Nothing was saved."
+        ) from exc
+    if unpacked > MAX_UNPACKED_BYTES:
+        raise IntakeError(
+            f"{name} would unpack to {unpacked / 1024**3:.1f} GB, above the "
+            f"{MAX_UNPACKED_BYTES / 1024**3:.0f} GB CA-Guard reads. If it is a genuine ledger, "
+            "save it as CSV and upload that instead. Nothing was saved."
+        )
+
+
+def _check_parquet_size(path: Path, name: str) -> None:
+    """Refuse a Parquet file with too many rows, before decoding it.
+
+    Only the row count is checked: Parquet's declared byte sizes describe the
+    encoded data, not decoded memory, so they cannot bound it. That is why
+    Parquet is not accepted from the browser at all (``UPLOAD_SUFFIXES``).
+    """
+    import pyarrow.parquet as pq
+
+    try:
+        rows = pq.ParquetFile(path).metadata.num_rows
+    except Exception as exc:  # pyarrow raises several types for a non-Parquet file
+        raise IntakeError(
+            f"{name} could not be read as a Parquet file. Nothing was saved."
+        ) from exc
+    if rows > MAX_ROWS:
+        raise IntakeError(
+            f"{name} has {rows:,} rows, above the {MAX_ROWS:,} limit. Nothing was saved."
+        )
 
 
 def _read_csv(path: Path, name: str) -> tuple[pd.DataFrame, str]:

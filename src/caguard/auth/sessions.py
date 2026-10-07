@@ -16,6 +16,7 @@ from __future__ import annotations
 import base64
 import hmac
 import json
+import os
 import secrets
 import time
 from dataclasses import dataclass
@@ -28,6 +29,7 @@ SESSION_SECONDS = 12 * 60 * 60
 
 COOKIE_NAME = "caguard_session"
 KEY_FILENAME = "session.key"
+MIN_KEY_BYTES = 32
 
 
 class InvalidSessionError(ValueError):
@@ -39,6 +41,9 @@ class SessionToken:
     user_id: str
     email: str
     expires_at: float
+    #: The user's session epoch when this was issued. Signing out bumps the
+    #: epoch, which ends every session issued before — including copies.
+    epoch: int = 0
 
     @property
     def expired(self) -> bool:
@@ -54,19 +59,31 @@ def load_or_create_key(directory: Path) -> bytes:
     directory.mkdir(parents=True, exist_ok=True)
     path = directory / KEY_FILENAME
     if path.exists():
-        return path.read_bytes()
+        key = path.read_bytes()
+        if len(key) < MIN_KEY_BYTES:
+            # An empty or truncated key would let anyone forge a session.
+            raise RuntimeError(
+                f"{path} holds a {len(key)}-byte signing key; at least {MIN_KEY_BYTES} are "
+                "needed. Delete the file to generate a new one (everyone will be signed out)."
+            )
+        return key
 
     key = secrets.token_bytes(32)
-    path.write_bytes(key)
-    path.chmod(0o600)
+    # Created owner-only from the first byte, not chmodded after writing.
+    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    with os.fdopen(descriptor, "wb") as handle:
+        handle.write(key)
     return key
 
 
-def issue(key: bytes, user_id: str, email: str, *, seconds: int = SESSION_SECONDS) -> str:
+def issue(
+    key: bytes, user_id: str, email: str, *, epoch: int = 0, seconds: int = SESSION_SECONDS
+) -> str:
     """Create a signed session cookie value."""
     payload = {
         "sub": user_id,
         "email": email,
+        "ep": epoch,
         "exp": time.time() + seconds,
         # A nonce, so two cookies issued in the same second differ.
         "jti": secrets.token_hex(8),
@@ -99,6 +116,9 @@ def read(key: bytes, cookie: str | None) -> SessionToken:
             user_id=str(payload["sub"]),
             email=str(payload["email"]),
             expires_at=float(payload["exp"]),
+            # Absent on cookies issued before epochs existed: those read as 0,
+            # which every account starts at, so the upgrade logs nobody out.
+            epoch=int(payload.get("ep", 0)),
         )
     except (ValueError, KeyError, TypeError) as exc:
         raise InvalidSessionError("unreadable session cookie") from exc

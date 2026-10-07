@@ -22,12 +22,12 @@ import tempfile
 from pathlib import Path
 
 import pandas as pd
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from caguard.api.auth_routes import build_auth_router, current_user_dependency
-from caguard.api.jobs import JobRunner, Progress
+from caguard.api.jobs import JobRunner, Progress, TooBusyError
 from caguard.api.models import (
     DecisionIn,
     DecisionOut,
@@ -43,6 +43,7 @@ from caguard.api.models import (
 from caguard.api.source_routes import build_source_router
 from caguard.api.workspace import Analysis, Workspace
 from caguard.auth import UserStore
+from caguard.auth.policy import check_configured_invite
 from caguard.auth.sessions import load_or_create_key
 from caguard.auth.users import User
 from caguard.detect.types import DetectorConfig
@@ -50,7 +51,7 @@ from caguard.explain.card import build_card
 from caguard.intake.normalise import normalise
 from caguard.intake.readers import (
     MAX_UPLOAD_BYTES,
-    SUPPORTED_SUFFIXES,
+    UPLOAD_SUFFIXES,
     read_table,
     safe_suffix,
 )
@@ -76,6 +77,8 @@ def create_app(
 ) -> FastAPI:
     """Build the application. Nothing is analysed until a ledger is uploaded."""
     data_dir = Path(store_path).parent
+    check_configured_invite()
+    _sweep_leftover_uploads(data_dir)
     demo = demo_mode()
     workspace = Workspace(
         isolate_users=demo,
@@ -88,10 +91,16 @@ def create_app(
     signing_key = load_or_create_key(data_dir)
 
     app = FastAPI(
+        # The interactive API docs are for a developer on the machine itself;
+        # a public demo has no use for them.
+        docs_url=None if demo else "/docs",
+        redoc_url=None,
+        openapi_url=None if demo else "/openapi.json",
         title="CA-Guard",
         summary="Private review workspace for Indian Chartered Accountants",
         version="0.1.0",
     )
+    app.middleware("http")(_security_headers)
     app.state.workspace = workspace
     jobs = JobRunner()
     app.state.jobs = jobs
@@ -162,7 +171,11 @@ def create_app(
             finally:
                 temp.unlink(missing_ok=True)
 
-        return JobOut.build(jobs.submit(user.id, work))
+        try:
+            return JobOut.build(jobs.submit(user.id, work))
+        except TooBusyError as exc:
+            temp.unlink(missing_ok=True)
+            raise HTTPException(429, str(exc)) from exc
 
     @app.get("/api/jobs/{job_id}", response_model=JobOut)
     def job_status(job_id: str, user: User = signed_in) -> JobOut:
@@ -189,7 +202,16 @@ def create_app(
             # year's ledger. Run on the event loop, they froze the whole server
             # for every user until they finished (measured: 12 s for a health
             # check during a 13.5 s analysis).
-            analysis = await run_in_threadpool(_ingest, workspace, temp, suffix, display_name, user)
+            # It also runs on the job pool, so this route cannot sidestep the
+            # bound on concurrent analyses (the waiting happens on a threadpool
+            # thread, never on the event loop).
+            analysis = await run_in_threadpool(
+                jobs.run,
+                user.id,
+                lambda: _ingest(workspace, temp, suffix, display_name, user),
+            )
+        except TooBusyError as exc:
+            raise HTTPException(429, str(exc)) from exc
         finally:
             temp.unlink(missing_ok=True)
         return _queue(workspace, analysis)
@@ -198,38 +220,12 @@ def create_app(
     def queue(engagement_id: str, user: User = signed_in) -> QueueOut:
         return _queue(workspace, workspace.require(engagement_id))
 
+    # Voucher numbers can contain "/" — Tally's "JV/2024/117" is common — and the
+    # server decodes %2F before routing, so these take a :path parameter. The
+    # longer route is declared first, or the greedy match would swallow
+    # "/explanation" into the voucher number.
     @scoped.get(
-        "/api/engagements/{engagement_id}/findings/{voucher_id}",
-        response_model=FindingOut,
-    )
-    def finding(engagement_id: str, voucher_id: str, user: User = signed_in) -> FindingOut:
-        analysis = workspace.require(engagement_id)
-        found = analysis.by_voucher.get(voucher_id)
-        if found is None:
-            raise HTTPException(404, f"No finding for voucher {voucher_id!r}")
-        current = workspace.store.current(engagement_id).get(voucher_id)
-        card = (
-            build_card(
-                found,
-                analysis.context,
-                account_names=analysis.account_names,
-                not_in_file=analysis.not_in_file,
-                flagged=analysis.flagged,
-                config=workspace.config,
-            )
-            if analysis.context is not None
-            else None
-        )
-        return FindingOut.build(
-            found,
-            current,
-            lines=analysis.lines_for(voucher_id),
-            source=analysis.source,
-            card=card,
-        )
-
-    @scoped.get(
-        "/api/engagements/{engagement_id}/findings/{voucher_id}/explanation",
+        "/api/engagements/{engagement_id}/findings/{voucher_id:path}/explanation",
         response_model=ExplanationOut,
     )
     def explanation(engagement_id: str, voucher_id: str, user: User = signed_in) -> ExplanationOut:
@@ -256,6 +252,36 @@ def create_app(
             provider=result.provider,
             latency_seconds=result.latency_seconds,
             provenance=result.provenance(),
+        )
+
+    @scoped.get(
+        "/api/engagements/{engagement_id}/findings/{voucher_id:path}",
+        response_model=FindingOut,
+    )
+    def finding(engagement_id: str, voucher_id: str, user: User = signed_in) -> FindingOut:
+        analysis = workspace.require(engagement_id)
+        found = analysis.by_voucher.get(voucher_id)
+        if found is None:
+            raise HTTPException(404, f"No finding for voucher {voucher_id!r}")
+        current = workspace.store.current(engagement_id).get(voucher_id)
+        card = (
+            build_card(
+                found,
+                analysis.context,
+                account_names=analysis.account_names,
+                not_in_file=analysis.not_in_file,
+                flagged=analysis.flagged,
+                config=workspace.config,
+            )
+            if analysis.context is not None
+            else None
+        )
+        return FindingOut.build(
+            found,
+            current,
+            lines=analysis.lines_for(voucher_id),
+            source=analysis.source,
+            card=card,
         )
 
     @scoped.post("/api/engagements/{engagement_id}/decisions", response_model=DecisionOut)
@@ -323,9 +349,43 @@ def _text_or_none(value: object) -> str | None:
     return value.strip() or None if isinstance(value, str) else None
 
 
+def _sweep_leftover_uploads(data_dir: Path) -> None:
+    """Delete upload files a previous run left behind (a crash, a cancelled job).
+
+    They are copies of client ledgers that nothing refers to. One API process
+    owns the data directory, so nothing current can be among them.
+    """
+    if not data_dir.exists():
+        return
+    removed = 0
+    for leftover in data_dir.glob("upload-*"):
+        leftover.unlink(missing_ok=True)
+        removed += 1
+    if removed:
+        event(logger, "startup.swept_uploads", files=removed)
+
+
 def demo_mode() -> bool:
     """Set on a hosted deployment (D-005, D-052): banner on, users isolated."""
     return os.environ.get("CAGUARD_DEMO", "").strip().lower() in {"1", "true", "yes"}
+
+
+#: The report is a standalone page holding client text. It needs no scripts,
+#: no network and no frames, so it is allowed none.
+REPORT_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; frame-ancestors 'none'"
+
+
+async def _security_headers(request: Request, call_next):
+    """A baseline on every API response, whichever proxy sits in front."""
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    # Ledger data must not linger in shared or browser caches.
+    response.headers.setdefault("Cache-Control", "no-store")
+    if request.url.path.endswith("/report.html"):
+        response.headers["Content-Security-Policy"] = REPORT_CSP
+    return response
 
 
 def _accepted(file: UploadFile) -> tuple[str, str]:
@@ -340,7 +400,7 @@ def _accepted(file: UploadFile) -> tuple[str, str]:
         raise HTTPException(
             400,
             f"{display_name} is not a file type CA-Guard reads. Upload "
-            f"{', '.join(sorted(SUPPORTED_SUFFIXES))}. Nothing was saved.",
+            f"{', '.join(sorted(UPLOAD_SUFFIXES))}. Nothing was saved.",
         )
     return display_name, suffix
 

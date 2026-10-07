@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import threading
 import time
+from collections import OrderedDict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import cached_property
@@ -34,6 +35,11 @@ from caguard.review.sources import SourceIntegrityError, SourceVault
 from caguard.review.store import ReviewStore, SourceFile
 
 logger = logging.getLogger("caguard.api")
+
+#: Analysed ledgers held in memory at once. A 30,000-voucher analysis is a few
+#: hundred MB; beyond this the least recently opened is dropped and rebuilt on
+#: demand from its stored original.
+MAX_CACHED_ANALYSES = 6
 
 
 @dataclass
@@ -96,7 +102,9 @@ class Workspace:
     vault: SourceVault
     config: DetectorConfig = field(default_factory=DetectorConfig)
     model: str = "none"
-    analyses: dict[str, Analysis] = field(default_factory=dict)
+    #: Most recently used last. Bounded: every engagement can be rebuilt from its
+    #: stored original, so holding all of them in memory is never necessary.
+    analyses: OrderedDict[str, Analysis] = field(default_factory=OrderedDict)
     #: Public-demo mode: each account sees only the engagements it opened.
     isolate_users: bool = False
     _reload_lock: threading.Lock = field(default_factory=threading.Lock)
@@ -134,6 +142,7 @@ class Workspace:
         )
         cached = self.analyses.get(engagement.id)
         if cached is not None:
+            self.analyses.move_to_end(engagement.id)
             return cached
         context = build_context(lines)
         analysis = Analysis(
@@ -144,9 +153,15 @@ class Workspace:
             raw=raw,
             context=context,
         )
-        self.analyses[engagement.id] = analysis
+        self._remember(analysis)
         self._record_stats(analysis)
         return analysis
+
+    def _remember(self, analysis: Analysis) -> None:
+        self.analyses[analysis.engagement.id] = analysis
+        self.analyses.move_to_end(analysis.engagement.id)
+        while len(self.analyses) > MAX_CACHED_ANALYSES:
+            self.analyses.popitem(last=False)
 
     def _record_stats(self, analysis: Analysis) -> None:
         bands = [f.band.value for f in analysis.findings]
@@ -239,6 +254,7 @@ class Workspace:
         """An engagement's analysis, re-built from its stored original if need be."""
         analysis = self.analyses.get(engagement_id)
         if analysis is not None:
+            self.analyses.move_to_end(engagement_id)
             return analysis
 
         engagement = self.store.engagement(engagement_id)
@@ -251,7 +267,7 @@ class Workspace:
             analysis = self.analyses.get(engagement_id)
             if analysis is None:
                 analysis = self._rebuild(engagement)
-                self.analyses[engagement_id] = analysis
+                self._remember(analysis)
         return analysis
 
     def forget(self, engagement_id: str) -> None:

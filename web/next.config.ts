@@ -13,6 +13,10 @@ const config: NextConfig = {
     proxyClientMaxBodySize: "200mb",
   },
 
+  async headers() {
+    return [{ source: "/:path*", headers: securityHeaders() }];
+  },
+
   // The API runs on this machine only. Proxying through Next keeps the browser
   // talking to one origin, so nothing needs CORS opened up.
   async rewrites() {
@@ -24,5 +28,41 @@ const config: NextConfig = {
     ];
   },
 };
+
+/**
+ * Headers on every response. The CSP is production-only because the dev server
+ * evaluates code at runtime. 'unsafe-inline' for scripts is what Next's inline
+ * bootstrap needs without a nonce-issuing middleware; React escapes all
+ * rendered text, and the policy still forbids every other origin, framing,
+ * plugins and form posts elsewhere.
+ */
+function securityHeaders() {
+  const headers = [
+    { key: "X-Content-Type-Options", value: "nosniff" },
+    { key: "X-Frame-Options", value: "DENY" },
+    { key: "Referrer-Policy", value: "no-referrer" },
+    { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+    // Ignored by browsers over plain http, so harmless on a local install.
+    { key: "Strict-Transport-Security", value: "max-age=31536000" },
+  ];
+  if (process.env.NODE_ENV === "production") {
+    headers.push({
+      key: "Content-Security-Policy",
+      value: [
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' data: blob:",
+        "font-src 'self' data:",
+        "connect-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+        "frame-ancestors 'none'",
+      ].join("; "),
+    });
+  }
+  return headers;
+}
 
 export default config;

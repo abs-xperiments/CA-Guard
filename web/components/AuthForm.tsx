@@ -77,6 +77,10 @@ export function Field({
       <span className="mb-1 block text-[12px] font-medium text-ink">{label}</span>
       <input
         type={type}
+        // A name lets password managers fill the field. The forms are
+        // method="post", so a submit before the page has hydrated can never put
+        // these values into a URL.
+        name={autoComplete ?? label.toLowerCase().replace(/\s+/g, "-")}
         value={value}
         required={required}
         autoFocus={autoFocus}

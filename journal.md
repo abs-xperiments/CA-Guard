@@ -827,3 +827,44 @@ Before changing anything, I re-read the whole project. Then I actually *used* it
 
 **Next step:** Phase 6, the security and privacy review: browser security headers, a written threat model, and making sure no screen claims more privacy than is true (e.g. "Everything stays on this machine" on the hosted demo).
 
+---
+
+## 2026-10-07 23:55 IST — [PHASE 6 of completion] Security review. An independent reviewer found real problems; all the serious ones are fixed.
+
+**What happened:** I hardened what I knew about, then asked a separate reviewer, with no stake in my earlier decisions, to try to break CA-Guard. That was worth doing.
+
+**The good news first:** they found **no way to get in without an account, and no way to see someone else's engagement**. The access design held.
+
+**What they found, all fixed and each pinned by a test:**
+1. **The CSV report could carry hidden spreadsheet formulas.** A malicious ledger, or a reviewer's name or note, could plant a formula that runs when a CA opens the export in Excel. Every cell is now neutralised. My first fix didn't work (a pandas detail meant it checked no columns at all); re-running their proof of concept caught that.
+2. **Signing out didn't really sign you out.** A copied login cookie kept working for up to 12 hours. Signing out now ends **every** session for that account, on every device. So does changing a password.
+3. **Invite codes could be guessed quickly.** Wrong guesses are now limited, and CA-Guard **won't start** if the configured code is shorter than 16 characters. (When we deploy I'll give you a command that generates a proper one.)
+4. **One account could overload the server.** It's now limited to 2 analyses at a time, and only 6 analysed ledgers are kept in memory (others reload from their stored file when opened).
+5. **Login timing revealed which email addresses have accounts.** It no longer does.
+6. Smaller fixes: memory limits on the login counter, safer creation of the key files, and clean-up of upload files left behind by a crash.
+
+**A real bug found along the way:** findings whose voucher number contains a slash, like Tally's "JV/2024/117", **could not be opened at all**. That would have made entire Tally ledgers unusable. Fixed and tested.
+
+**A product change:** the workspace no longer accepts **Parquet** files. No accounting software exports them, and I measured that a small Parquet file can expand roughly 10,000-fold in memory, with no way to detect it in advance. CSV and Excel (`.xlsx`, `.xls`) are unchanged, and Parquet still works from the command line for our research tools.
+
+**Also in this phase:**
+- Browser security protections on every page; I checked in a real browser that sign-in still works with them on.
+- Excel "zip bombs" (tiny files that unpack to gigabytes) are refused.
+- No screen says "this machine" any more (untrue on the hosted demo).
+- Password managers can now fill the login form.
+
+**One of my own mistakes:** the end-to-end check had been silently testing an old copy of the app left running from my earlier testing. It now refuses to run if that can happen, and it runs automatically in CI.
+
+**Deliberately not done (recorded with reasons):**
+- someone who knows your email can lock you out for 15 minutes;
+- a stricter browser policy needs extra machinery;
+- container packaging fixes belong to the deployment phase.
+
+**Tests/checks:**
+- ruff ✅ · pyright 0 errors ✅ · **670 tests** ✅ (31 new) · TypeScript ✅ · web build ✅
+- both dependency audits clean ✅ · smoke test 6/6 ✅
+
+**Founder decision needed:** none. (Dropping Parquet uploads is recorded as D-065; tell me if you disagree.)
+
+**Next step:** Phase 7, a full test sweep. Browser-driven end-to-end tests of the whole workflow, the remaining awkward inputs, restart in the middle of a review, and three walk-throughs as different kinds of user.
+

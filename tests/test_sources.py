@@ -94,7 +94,7 @@ def _vault(store: Path) -> list[Path]:
 # --- the original, exactly ----------------------------------------------------
 
 
-@pytest.mark.parametrize("kind", ["csv", "xlsx", "xls", "parquet"])
+@pytest.mark.parametrize("kind", ["csv", "xlsx", "xls"])
 def test_the_downloaded_original_is_byte_identical(
     client: TestClient, ledger: pd.DataFrame, csv_bytes: bytes, xlsx_bytes: bytes, kind: str
 ) -> None:
@@ -102,12 +102,8 @@ def test_the_downloaded_original_is_byte_identical(
         payload = csv_bytes
     elif kind == "xlsx":
         payload = xlsx_bytes
-    elif kind == "xls":
-        payload = (FIXTURES / "legacy_ledger.xls").read_bytes()
     else:
-        buffer = io.BytesIO()
-        ledger.to_parquet(buffer, index=False)
-        payload = buffer.getvalue()
+        payload = (FIXTURES / "legacy_ledger.xls").read_bytes()
 
     queue = _upload(client, f"Client Books FY25.{kind}", payload)
     engagement = queue["engagement"]["id"]

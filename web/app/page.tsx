@@ -109,7 +109,7 @@ export default function Home() {
         </h1>
         <p className="mt-2 max-w-xl text-sm leading-relaxed text-ink-muted">
           CA-Guard reads a general ledger, prioritises the entries that deserve
-          attention, and shows you why. Everything stays on this machine.
+          attention, and shows you why. Everything stays on the computer running CA-Guard.
         </p>
       </header>
 
@@ -144,7 +144,7 @@ export default function Home() {
               Drop a ledger here, or choose a file
             </p>
             <p className="mt-1 text-[13px] text-ink-muted">
-              CSV, Excel or Parquet. The file stays on the computer running CA-Guard, kept
+              CSV or Excel (.xlsx, .xls). The file stays on the computer running CA-Guard, kept
               exactly as uploaded so you can download it again.
             </p>
             {uploadError ? (
@@ -171,7 +171,7 @@ export default function Home() {
         <input
           ref={input}
           type="file"
-          accept=".csv,.xlsx,.xls,.parquet"
+          accept=".csv,.xlsx,.xls"
           className="hidden"
           onChange={(event) => {
             const file = event.target.files?.[0];
@@ -190,7 +190,7 @@ export default function Home() {
           <EmptyState
             icon={<FolderOpen size={22} />}
             title="No reviews yet"
-            detail="Open a ledger above to start one. Your decisions are kept on this machine and will be here when you come back."
+            detail="Open a ledger above to start one. Your decisions are kept by CA-Guard and will be here when you come back."
           />
         ) : (
           <ul className="divide-y divide-line overflow-hidden rounded-lg border border-line bg-surface">

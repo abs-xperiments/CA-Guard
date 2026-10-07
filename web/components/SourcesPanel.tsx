@@ -52,7 +52,7 @@ export function SourcesPanel({
       toast.show({
         tone: "success",
         message: `Deleted ${source.filename}`,
-        detail: "The file is gone from this machine. Decisions already recorded are kept.",
+        detail: "The file is deleted from CA-Guard’s storage. Decisions already recorded are kept.",
       });
       setConfirming(null);
       await load();
@@ -147,7 +147,7 @@ export function SourcesPanel({
                           <Button
                             variant="quiet"
                             onClick={() => setConfirming(source.id)}
-                            title="Delete this file from this machine"
+                            title="Delete this file from CA-Guard’s storage"
                           >
                             <Trash2 size={14} /> Delete
                           </Button>

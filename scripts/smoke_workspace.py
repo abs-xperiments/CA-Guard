@@ -17,6 +17,7 @@ from __future__ import annotations
 import io
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -43,6 +44,14 @@ def main() -> int:
         print("web/ is not built. Run: cd web && npm run build", file=sys.stderr)
         return 2
 
+    for port in (8000, WEB_PORT):
+        if _port_in_use(port):
+            # A server already on the port would answer instead of the build
+            # under test — and every check would quietly test the wrong code.
+            print(f"Port {port} is already in use. Stop whatever is running there first.",
+                  file=sys.stderr)  # fmt: skip
+            return 2
+
     workdir = Path(tempfile.mkdtemp(prefix="caguard-smoke-"))
     processes: list[subprocess.Popen[bytes]] = []
     try:
@@ -68,6 +77,15 @@ def _run_checks(ledger: Path) -> int:
             failures.append(name)
 
     with httpx.Client(base_url=WEB, timeout=180) as web:
+        page = web.get("/login")
+        csp = page.headers.get("content-security-policy", "")
+        check(
+            "workspace pages carry security headers",
+            "frame-ancestors 'none'" in csp
+            and page.headers.get("x-content-type-options") == "nosniff",
+            csp[:60] + "…" if csp else "no CSP header",
+        )
+
         signup = web.post(
             "/api/auth/signup",
             json={"email": "smoke@example.com", "name": "Smoke", "password": "smoke-pass-123"},
@@ -144,9 +162,17 @@ def _start_api(workdir: Path) -> subprocess.Popen[bytes]:
 
 def _start_web() -> subprocess.Popen[bytes]:
     return subprocess.Popen(
-        ["npx", "next", "start", "--port", str(WEB_PORT), "--hostname", "127.0.0.1"],
+        # The project's own Next binary, not npx: npx can stall resolving the
+        # package, and the build under test is the one in web/node_modules.
+        [str(ROOT / "web" / "node_modules" / ".bin" / "next"), "start",
+         "--port", str(WEB_PORT), "--hostname", "127.0.0.1"],
         cwd=ROOT / "web", stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
     )  # fmt: skip
+
+
+def _port_in_use(port: int) -> bool:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+        return probe.connect_ex(("127.0.0.1", port)) == 0
 
 
 def _wait_for(url: str, seconds: float = 60) -> None:

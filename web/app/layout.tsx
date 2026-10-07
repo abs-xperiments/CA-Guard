@@ -4,7 +4,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "CA-Guard",
   description:
-    "A private review workspace: find, understand and record decisions on unusual financial transactions.",
+    "A review workspace for Chartered Accountants: find, understand and record decisions on unusual financial transactions.",
 };
 
 import { DemoBanner } from "@/components/DemoBanner";
