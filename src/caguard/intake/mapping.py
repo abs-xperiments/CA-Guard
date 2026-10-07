@@ -12,6 +12,7 @@ every downstream number is wrong in a way nobody notices.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 
 # Canonical field -> header spellings seen in the wild, all lower-cased and
@@ -114,6 +115,10 @@ ALIASES: dict[str, frozenset[str]] = {
         {"credit", "credit amount", "credit_amount", "cr", "cr amount", "credit inr", "credit rs"}
     ),
     "amount": frozenset({"amount", "transaction amount", "local amount", "local_amount", "value"}),
+    # CA-Guard's own export format: already in paise, and kept apart from the
+    # rupee columns above because confusing the two is a hundred-fold error.
+    "debit_paise": frozenset({"debit_paise", "debit paise"}),
+    "credit_paise": frozenset({"credit_paise", "credit paise"}),
     "currency": frozenset({"currency", "curr", "currency code"}),
     "created_by": frozenset(
         {"created by", "created_by", "user", "user id", "entered by", "preparer", "maker"}
@@ -177,13 +182,21 @@ class ColumnMapping:
     @property
     def missing_required(self) -> list[str]:
         needed = {"voucher_id", "voucher_date", "account_name"}
-        has_amount = {"debit", "credit"} <= set(self.resolved.values()) or (
-            "amount" in self.resolved.values()
-        )
+        has_amount = has_amount_columns(self.resolved.values())
         missing = sorted(needed - set(self.resolved.values()))
         if not has_amount:
             missing.append("debit/credit or amount")
         return missing
+
+
+def has_amount_columns(targets: Iterable[str]) -> bool:
+    """Whether mapped columns can produce debits and credits.
+
+    One rule, used everywhere: either side of a rupee or paise debit/credit
+    pair (the other side is then zero), or a single signed amount.
+    """
+    found = set(targets)
+    return bool(found & {"debit", "credit", "debit_paise", "credit_paise", "amount"})
 
 
 def normalise(header: str) -> str:

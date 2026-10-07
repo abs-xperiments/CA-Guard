@@ -198,3 +198,66 @@ def test_real_world_header_shapes_are_usable(headers: list[str]) -> None:
     frame[headers[1]] = ["V1"]
     frame[headers[2]] = ["Rent"]
     normalise(frame)  # must not raise
+
+
+def test_our_own_format_missing_a_column_is_filled_and_disclosed() -> None:
+    """Found in Phase 3: this used to crash the analysis with a 500.
+
+    A file with CA-Guard's own headers but no document column skipped the
+    defaults, so the detectors met a column that was not there.
+    """
+    from caguard.benchmark.generator import GeneratorConfig, generate
+    from caguard.review.fusion import build_findings
+
+    full = generate(GeneratorConfig(seed=31, n_vouchers=250)).lines
+    partial = full.drop(columns=["document_ref"]).astype(str)
+
+    result = normalise(partial)
+
+    assert "document_ref" in result.report.defaulted
+    assert any("supporting-document column" in note for note in result.report.notes)
+    # Paise stay paise: a hundred-fold error here would be invisible and severe.
+    assert result.lines.debit_paise.sum() == full.debit_paise.sum()
+    build_findings(result.lines)  # and the analysis runs
+
+
+# --- dates: parsed value by value, never guessed from the first row ----------
+
+
+@pytest.mark.parametrize(
+    ("values", "expected"),
+    [
+        # ISO, as Excel and most systems export. Used to read 1 April as 4 January.
+        (["2024-04-01", "2024-04-16", "2024-05-03"], ["2024-04-01", "2024-04-16", "2024-05-03"]),
+        # Excel dates that arrive as text with a time.
+        (["2024-04-01 00:00:00", "2024-04-16 00:00:00"], ["2024-04-01", "2024-04-16"]),
+        # Indian day-first, with separators that change between rows.
+        (["01-04-2024", "16-04-2024", "03/05/2024"], ["2024-04-01", "2024-04-16", "2024-05-03"]),
+        # Excel serial numbers.
+        (["45383", "45399"], ["2024-04-01", "2024-04-17"]),
+        # Year-first with slashes, blanks, and something that is not a date.
+        (["2024/04/16", "", None, "not a date"], ["2024-04-16", None, None, None]),
+    ],
+)
+def test_dates_are_read_the_way_the_file_wrote_them(values, expected) -> None:
+    from caguard.intake.normalise import parse_dates
+
+    parsed = [str(d.date()) if pd.notna(d) else None for d in parse_dates(values)]
+    assert parsed == expected
+
+
+def test_rows_with_unreadable_dates_are_disclosed_not_silently_dropped() -> None:
+    frame = pd.DataFrame(
+        {
+            "Voucher No": ["J1", "J1", "J2", "J2"],
+            "Date": ["2024-04-16", "2024-04-16", "31st of never", "31st of never"],
+            "Ledger": ["Rent", "Bank", "Rent", "Bank"],
+            "Debit": ["1000", "", "500", ""],
+            "Credit": ["", "1000", "", "500"],
+        }
+    )
+    result = normalise(frame)
+
+    assert result.report.unreadable_dates == 2
+    assert any("could not read" in note for note in result.report.notes)
+    assert str(result.lines.voucher_date.iloc[0].date()) == "2024-04-16"

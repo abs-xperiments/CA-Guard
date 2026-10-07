@@ -24,13 +24,15 @@ finding about the client.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 import pandas as pd
 
-from caguard.intake.mapping import ColumnMapping, infer_mapping
+from caguard.intake.mapping import ColumnMapping, has_amount_columns, infer_mapping
 from caguard.schema import (
     AccountGroup,
+    JournalLine,
     TimeFidelity,
     VoucherType,
     fiscal_period_of,
@@ -78,11 +80,18 @@ class NormalisationReport:
     rows_out: int = 0
     #: How a CSV was decoded, when the reader recorded it.
     encoding: str | None = None
+    #: Rows whose voucher date was present but could not be read as a date.
+    unreadable_dates: int = 0
 
     @property
     def notes(self) -> list[str]:
         """Caveats worth putting in front of the reviewer before they trust the queue."""
         messages: list[str] = []
+        if self.unreadable_dates:
+            messages.append(
+                f"{self.unreadable_dates:,} row(s) had a voucher date CA-Guard could not read "
+                "and were left out of the review. Check the date column in the file."
+            )
         if self.encoding and self.encoding != "utf-8-sig":
             messages.append(
                 f"This file was not UTF-8; it was read as {self.encoding.upper()}. "
@@ -199,7 +208,14 @@ def _source_rows(index: pd.Index) -> pd.Series:
 
 
 def _is_canonical(frame: pd.DataFrame) -> bool:
-    return {"voucher_id", "voucher_date", "debit_paise", "credit_paise"} <= set(frame.columns)
+    """Every canonical column is present, so only typing is needed.
+
+    All of them, not just the four that identify a ledger: a file with our
+    headers but no document column used to take this path, skip the defaults
+    the mapping path applies, and crash the analysis. Anything less than the
+    full set goes through mapping, which fills and *records* what is missing.
+    """
+    return set(JournalLine.model_fields) <= set(frame.columns)
 
 
 def _fall_back_to_posting_date(mapping: ColumnMapping) -> None:
@@ -218,9 +234,7 @@ def _fall_back_to_posting_date(mapping: ColumnMapping) -> None:
 
 def _check_usable(mapping: ColumnMapping, report: NormalisationReport) -> None:
     missing = [column for column in ESSENTIAL if column not in mapping.resolved.values()]
-    has_amount = {"debit", "credit"} & set(mapping.resolved.values()) or {"amount"} & set(
-        mapping.resolved.values()
-    )
+    has_amount = has_amount_columns(mapping.resolved.values())
 
     problems: list[str] = []
     if missing:
@@ -268,6 +282,11 @@ def _amounts(src: pd.DataFrame, out: pd.DataFrame, report: NormalisationReport) 
     A mapped ``Debit`` column is rupees; a canonical ``debit_paise`` is already
     paise. Confusing the two is a hundred-fold error, so they are handled apart.
     """
+    if "debit_paise" in src.columns or "credit_paise" in src.columns:
+        out["debit_paise"] = _paise(src.get("debit_paise"))
+        out["credit_paise"] = _paise(src.get("credit_paise"))
+        return
+
     if "debit" in src.columns or "credit" in src.columns:
         out["debit_paise"] = _rupees_to_paise(src.get("debit"))
         out["credit_paise"] = _rupees_to_paise(src.get("credit"))
@@ -282,12 +301,13 @@ def _amounts(src: pd.DataFrame, out: pd.DataFrame, report: NormalisationReport) 
 
 
 def _dates(src: pd.DataFrame, out: pd.DataFrame, report: NormalisationReport) -> None:
-    # dayfirst: an Indian ledger writes 03-04-2025 as 3 April, not 4 March.
-    dates = pd.to_datetime(src["voucher_date"], errors="coerce", dayfirst=True)
+    dates = parse_dates(src["voucher_date"])
     out["voucher_date"] = dates
+    present = _has_text(pd.Series(src["voucher_date"]))
+    report.unreadable_dates = int((dates.isna() & present).sum())
 
     if "posted_at" in src.columns:
-        out["posted_at"] = pd.to_datetime(src["posted_at"], errors="coerce", dayfirst=True)
+        out["posted_at"] = parse_dates(src["posted_at"])
         stamps = pd.Series(pd.to_datetime(out["posted_at"], errors="coerce"))
         midnight_only = bool(
             stamps.dt.hour.fillna(0).eq(0).all() and stamps.dt.minute.fillna(0).eq(0).all()
@@ -311,6 +331,59 @@ def _dates(src: pd.DataFrame, out: pd.DataFrame, report: NormalisationReport) ->
         for day, present in zip(dates, valid, strict=True)
     ]
     report.derived.extend(["fiscal_year", "period"])
+
+
+#: ``2024-04-01``, ``2024/04/01``, optionally with a time: read year-first.
+_ISO_RE = re.compile(r"^\d{4}[-/]\d{1,2}[-/]\d{1,2}")
+
+#: Excel stores dates as days since 30 December 1899. A bare number in this
+#: range in a date column is one of those (1954 to 2119).
+_EXCEL_SERIAL = (20_000, 80_000)
+
+
+def parse_dates(values: object) -> pd.Series:
+    """Dates as an Indian ledger writes them, without guessing from the first row.
+
+    pandas, given a whole column, infers *one* format from the first value.
+    With ``dayfirst=True`` an ISO ``2024-04-01`` is then read as year-day-month:
+    1 April silently becomes 4 January, and every later date with a day above
+    12 fails and its row is dropped. Exports from Excel arrive as exactly that
+    ISO text. So each value is parsed on its own terms:
+
+    - year-first values (ISO, as Excel and most systems write) as year-month-day;
+    - everything else day-first, value by value — the Indian convention, so
+      ``03/05/2024`` is 3 May;
+    - bare Excel serial numbers as Excel dates.
+    """
+    texts = [_as_text(v) for v in pd.Series(values)]  # pyright: ignore[reportArgumentType]
+    text = pd.Series(texts, dtype=object)
+    parsed = pd.Series(pd.NaT, index=text.index, dtype="datetime64[ns]")
+
+    iso = pd.Series([bool(_ISO_RE.match(t)) for t in texts], index=text.index)
+    if iso.any():
+        dashed = pd.Series([t.replace("/", "-") for t in texts], index=text.index)
+        parsed[iso] = pd.to_datetime(dashed[iso], errors="coerce", format="ISO8601")
+
+    numeric = pd.Series(pd.to_numeric(text, errors="coerce"), index=text.index)
+    low, high = _EXCEL_SERIAL
+    serial = ~iso & (numeric >= low) & (numeric <= high)
+    if serial.any():
+        parsed[serial] = pd.to_datetime(numeric[serial], unit="D", origin="1899-12-30")
+
+    rest = ~iso & ~serial & (text != "")
+    if rest.any():
+        parsed[rest] = pd.to_datetime(text[rest], errors="coerce", dayfirst=True, format="mixed")
+    return parsed
+
+
+def _as_text(value: object) -> str:
+    if value is None or value is pd.NaT or (isinstance(value, float) and value != value):
+        return ""
+    return str(value).strip()
+
+
+def _has_text(values: pd.Series) -> pd.Series:
+    return pd.Series([_as_text(v) != "" for v in values], index=values.index)
 
 
 def _identity(src: pd.DataFrame, out: pd.DataFrame, report: NormalisationReport) -> None:
@@ -371,6 +444,14 @@ def _clean_text(series: object) -> pd.Series:
     return text.map(
         lambda value: None if value is None or not str(value).strip() else str(value).strip()
     )
+
+
+def _paise(series: object) -> pd.Series:
+    """A column already in paise: whole numbers, taken as they are."""
+    if series is None:
+        return pd.Series(0, dtype="int64")
+    numeric = pd.Series(pd.to_numeric(pd.Series(series), errors="coerce")).fillna(0)  # pyright: ignore[reportArgumentType]
+    return numeric.round().astype("int64")
 
 
 def _rupees_to_paise(series: object) -> pd.Series:
