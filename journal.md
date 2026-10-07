@@ -722,3 +722,44 @@ Before changing anything, I re-read the whole project. Then I actually *used* it
 **Founder decision needed:** none.
 
 **Next step:** Phase 3, the Explain Finding experience. For each signal it adds the working (for example "typical for this account: ₹40,000–₹1,20,000, from 312 entries"), clearer contribution labels, "not in this file" versus "missing" evidence, similar transactions, a suggested next step, and a guard that rejects an AI explanation that leaves a concern out.
+
+---
+
+## 2026-10-08 00:40 IST — [PHASE 3 of completion] "Explain this finding" now answers what a CA asks. And I found a serious date bug.
+
+**What happened:** opening a finding now shows a full explanation, in the order a reviewer thinks:
+
+1. **One sentence on why**, e.g. *"Prioritised for review mainly because it has no supporting document, is a manual entry at the year end and was entered after the books closed."* Directly under it: *"This finding means the entry deserves review. It does not, by itself, establish an error, a misstatement or wrongdoing."*
+2. **Each reason with its working.** Not just "unusual amount", but: *usual amount on Cash in Hand ₹35,000; typical range ₹20,000–₹55,000; 33 entries compared.* Each reason is labelled High, Medium or Low, and where an auditing standard names that kind of entry it says so (e.g. "Relates to SA 240, post-closing entries").
+3. **Evidence in four honest states:** present, missing, not required (e.g. below the approval limit) and **not in the file**. The last one matters: if a ledger is exported without a document column, CA-Guard now says "cannot be checked" instead of telling you the client has no documents.
+4. **The transaction itself**, and where it sits in your file.
+5. **Similar entries from the same ledger.** In one test it showed three similar undocumented year-end entries, all by the same preparer. That is the kind of pattern that changes how you approach a review.
+6. **Suggested review steps**, written as procedures, never conclusions.
+
+**No AI is needed for any of this.** It is built entirely from CA-Guard's own calculations, so it can't make things up and never makes you wait. If a local AI model is installed, it can still write a paragraph version underneath. Its paragraph is now **rejected if it leaves out any of the reasons**, as well as if it invents a number or uses conclusion words.
+
+**Smaller things:**
+- The "Statistically unusual" badge no longer appears on most rows. It contributed about 2%, and our own research says it adds nothing on its own, so it is now listed as "also noted".
+- A finding has its own web address now, so you can refresh, or send a colleague straight to it.
+
+---
+
+**[IMPORTANT] A serious bug, found and fixed: some dates were being read wrongly.**
+- **What happened:** when an uploaded file had dates like `2024-04-01` (which is how Excel date cells and most systems export them), CA-Guard read that as **4 January** instead of 1 April. Any date with a day above 12 was thrown away along with its row, without saying so.
+- **What was not affected:** CSVs with dates written as 01-04-2024 throughout (like typical Tally text exports), and all our research numbers. The benchmark regenerates identically.
+- **What may have been affected:** any Excel ledger uploaded before today that went through column mapping. If you tried a real client-style Excel file earlier, its year-end and Sunday findings could have been wrong. **Please re-upload it.**
+- **Now:** every date is read on its own terms. If a date can't be read at all, the intake notice says how many rows were left out and why.
+- I also fixed a crash when a file in CA-Guard's own format was missing one column.
+
+**Tests/checks:**
+- ruff ✅ · pyright 0 errors ✅ · **619 tests** ✅ (28 new) · TypeScript ✅ · web build ✅
+- benchmark unchanged ✅
+- browser check of the full card via a deep link ✅
+
+**Not done, and why:** I couldn't measure the installed local AI model against the stricter check, because the Mac didn't have enough free memory. CA-Guard's own safety check refused to start it, which is the right behaviour. The stricter check can only make the AI paragraph fall back to CA-Guard's wording more often, never show something less reliable.
+
+**Something for later, not changed now:** the opening-balance entry gets flagged partly as an "unusual amount for Cash in Hand", because it compares the whole opening balance with ordinary petty-cash entries. Excluding opening balances from that comparison looks right, but detector settings are frozen until the benchmark is re-run. I've recorded it as a candidate for the research track.
+
+**Founder decision needed:** none.
+
+**Next step:** Phase 4, the review workflow. The new button wording you chose, a better dashboard, search, and a report that clearly separates what CA-Guard found from what the reviewer decided.

@@ -13,6 +13,8 @@ from datetime import datetime
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
 
+from caguard.explain.card import ExplanationCard
+from caguard.explain.vocabulary import contribution_level, is_minor
 from caguard.money import format_inr
 from caguard.review.decisions import Decision, ReviewAction
 from caguard.review.engagement import Engagement
@@ -25,6 +27,10 @@ class SignalOut(BaseModel):
     reason: str
     strength: float
     contribution: float
+    #: High / Medium / Low, so a reviewer is not left to interpret 0.6375.
+    level: str = "Low"
+    #: Below the display floor: "also noted", not a headline reason.
+    minor: bool = False
     evidence: dict[str, object] = Field(default_factory=dict)
 
 
@@ -166,6 +172,21 @@ def _int(value: object) -> int:
         return 0
 
 
+def _headline_concerns(finding: Finding) -> list[str]:
+    """The reasons worth a chip in the queue: strongest first, minor ones left out.
+
+    Ordered by contribution, not alphabetically, so the first chip is the main
+    reason. A signal under the display floor — usually the ML layer at ~2% —
+    stays on the card as "also noted" instead of headlining every row.
+    """
+    ranked = sorted(finding.signals, key=lambda h: -finding.contributions.get(h.kind, 0.0))
+    kinds: list[str] = []
+    for hit in ranked:
+        if hit.kind.value not in kinds and not is_minor(finding.contributions.get(hit.kind, 0.0)):
+            kinds.append(hit.kind.value)
+    return kinds or [ranked[0].kind.value]
+
+
 class FindingOut(BaseModel):
     voucher_id: str
     voucher_date: str
@@ -184,6 +205,8 @@ class FindingOut(BaseModel):
     #: queue so a 36,000-finding queue is not also 100,000 ledger lines.
     lines: list[LineOut] = Field(default_factory=list)
     source: SourceRefOut | None = None
+    #: The structured explanation. Single finding only, like ``lines``.
+    card: ExplanationCard | None = None
 
     @classmethod
     def build(
@@ -193,6 +216,7 @@ class FindingOut(BaseModel):
         *,
         lines: pd.DataFrame | None = None,
         source: SourceFile | None = None,
+        card: ExplanationCard | None = None,
     ) -> FindingOut:
         return cls(
             voucher_id=finding.voucher_id,
@@ -201,13 +225,15 @@ class FindingOut(BaseModel):
             amount_display=format_inr(finding.amount_paise),
             priority=round(finding.priority, 4),
             band=finding.band,
-            concerns=[kind.value for kind in finding.kinds],
+            concerns=_headline_concerns(finding),
             signals=[
                 SignalOut(
                     kind=hit.kind.value,
                     reason=hit.reason,
                     strength=round(hit.strength, 3),
                     contribution=round(finding.contributions.get(hit.kind, 0.0), 4),
+                    level=contribution_level(finding.contributions.get(hit.kind, 0.0)),
+                    minor=is_minor(finding.contributions.get(hit.kind, 0.0)),
                     evidence=dict(hit.evidence),
                 )
                 for hit in sorted(
@@ -230,6 +256,7 @@ class FindingOut(BaseModel):
             note=decision.note if decision else None,
             lines=LineOut.from_frame(lines) if lines is not None else [],
             source=SourceRefOut(id=source.id, filename=source.filename) if source else None,
+            card=card,
         )
 
 

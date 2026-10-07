@@ -9,7 +9,62 @@ export interface Signal {
   reason: string;
   strength: number;
   contribution: number;
+  level: "High" | "Medium" | "Low";
+  /** Below the display floor: "also noted", not a headline reason. */
+  minor: boolean;
   evidence: Record<string, unknown>;
+}
+
+/** The structured explanation. Built by CA-Guard from recorded facts; no model involved. */
+export interface ExplanationCard {
+  summary: string;
+  limitation: string;
+  priority: number;
+  priority_method: string;
+  evidence_uplift: number;
+  signals: CardSignal[];
+  evidence: EvidenceItem[];
+  evidence_present: number;
+  evidence_expected: number;
+  profile: AccountProfile | null;
+  similar: ComparableEntry[];
+  next_steps: string[];
+}
+
+export interface CardSignal {
+  kind: string;
+  title: string;
+  reason: string;
+  contribution: number;
+  level: "High" | "Medium" | "Low";
+  minor: boolean;
+  working: { label: string; value: string }[];
+  standard: string | null;
+}
+
+export interface EvidenceItem {
+  name: string;
+  state: "present" | "missing" | "not_expected" | "not_in_file";
+  detail: string;
+}
+
+export interface AccountProfile {
+  account_code: string;
+  account_name: string;
+  entries: number;
+  median: string;
+  typical_range: string;
+}
+
+export interface ComparableEntry {
+  voucher_id: string;
+  voucher_date: string;
+  amount_display: string;
+  has_document: boolean;
+  narration: string | null;
+  created_by: string | null;
+  is_flagged: boolean;
+  basis: string;
 }
 
 export interface Evidence {
@@ -39,6 +94,8 @@ export interface Finding {
   /** The transaction itself. Present on a single finding, empty in the queue. */
   lines: LedgerLine[];
   source: SourceRef | null;
+  /** The structured explanation. Present on a single finding only. */
+  card: ExplanationCard | null;
 }
 
 /** One ledger line behind a finding, and where it sits in the uploaded file. */

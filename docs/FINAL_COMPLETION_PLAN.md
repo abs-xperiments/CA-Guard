@@ -1,6 +1,6 @@
 # CA-Guard — Final Completion Plan
 
-**Audit date:** 2026-10-07 21:10 IST · **Baseline commit:** `695e904` · **Status:** Phases 1–2 ✅ done (2026-10-07 22:50 IST); Phase 3 next
+**Audit date:** 2026-10-07 21:10 IST · **Baseline commit:** `695e904` · **Status:** Phases 1–3 ✅ done (2026-10-08 00:40 IST); Phase 4 next
 
 This plan comes from a full re-sync with the repository. That meant reading the code, docs, ADRs and journal, then actually *running* the product: the CLI, the API, the Next.js workspace in a browser, and the benchmark. Every defect below was reproduced, not inferred. Where something was not verified, it says so.
 
@@ -232,7 +232,28 @@ Fixed along the way: workspace keyboard shortcuts now pause while any dialog is 
 - a path-traversal filename cannot influence any path;
 - the preview never renders raw HTML.
 
-### Phase 3 — Explain Finding (§4.4)
+### Phase 3 — Explain Finding (§4.4) — ✅ done 2026-10-08 00:40 IST
+
+**How the criteria were met:**
+- **The card** (`explain/card.py`) is fully deterministic, so it works identically with no model. It contains:
+  - a one-line summary, with the limitation directly under it;
+  - every signal with its working, a High/Medium/Low level plus the exact figure, and an SA reference where a standard names the characteristic (`docs/RESEARCH_SA_MAPPING.md`);
+  - evidence in four states, with "x of y expected items present";
+  - the account profile and up to 3 similar entries (flagged ones open in place);
+  - suggested review steps.
+- **Shared wording** (`explain/vocabulary.py`): one source for titles, phrases, steps and the guard's cues. A test proves every detector's own reason text satisfies its cues.
+- **Amount working** comes from the detector itself (median, middle-80% range, entries compared) and is checked against an independent recomputation.
+- **Guard:** rejects model prose that omits a non-minor concern. The card's own text is tested against the forbidden-conclusion list.
+- **Queue:** the ML layer's ~2% signal no longer appears as a queue chip; chips are ordered by contribution.
+- **Deep link:** `?finding=V…` survives a refresh.
+
+**Found and fixed along the way** (separate commit `16d306e`):
+- dates were mis-read for ISO and Excel-sourced files;
+- a canonical-format file missing one optional column crashed the analysis.
+
+**Not done:** measuring the installed Qwen3 1.7B against the stricter omission guard. The machine had ~1 GB free with heavy swap, and the project's memory guard refused. The stricter guard can only make the model *fall back more often*, never show something less grounded. To do: run `caguard explain` evaluation when memory allows.
+
+**Observation for the detector backlog (not changed; thresholds are frozen by ADR-0004):** the opening-balance voucher is flagged partly as an "unusual amount" on Cash in Hand, because the comparison group is the *minimum* debit account of a multi-line voucher. A candidate improvement for the research track is to exclude opening-balance vouchers from amount and pairing signals. It needs a benchmark run before adoption.
 **Acceptance:**
 - for every signal kind, the finding card shows: transaction lines with account names and Dr/Cr; the signal's working (with comparison group and counts where applicable); a labelled contribution; the evidence state (present / missing / not expected / not in file); similar transactions; a suggested review step; the source location; the limitation;
 - no field on the card is computed by the LLM;

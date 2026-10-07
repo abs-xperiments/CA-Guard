@@ -18,6 +18,7 @@ from pathlib import Path
 import pandas as pd
 from fastapi import HTTPException
 
+from caguard.detect.context import LedgerContext, build_context
 from caguard.detect.types import DetectorConfig
 from caguard.explain.ollama import OllamaProvider
 from caguard.explain.service import ExplanationService
@@ -44,6 +45,28 @@ class Analysis:
     raw: pd.DataFrame | None = None
     #: The stored original these findings were computed from.
     source: SourceFile | None = None
+    #: The per-voucher view the detectors used; the explanation card reuses it
+    #: so its comparisons are the detectors' comparisons.
+    context: LedgerContext | None = None
+
+    @cached_property
+    def flagged(self) -> frozenset[str]:
+        return frozenset(f.voucher_id for f in self.findings)
+
+    @cached_property
+    def account_names(self) -> dict[str, str]:
+        if not {"account_code", "account_name"} <= set(self.lines.columns):
+            return {}
+        names: dict[str, str] = {}
+        pairs = self.lines[["account_code", "account_name"]].dropna()
+        for code, name in pairs.itertuples(index=False):
+            names.setdefault(str(code), str(name))  # first name seen wins
+        return names
+
+    @property
+    def not_in_file(self) -> frozenset[str]:
+        """Columns the uploaded file did not have, so cannot be judged on."""
+        return frozenset(self.intake.defaulted) if self.intake else frozenset()
 
     @cached_property
     def by_voucher(self) -> dict[str, Finding]:
@@ -103,8 +126,14 @@ class Workspace:
         cached = self.analyses.get(engagement.id)
         if cached is not None:
             return cached
+        context = build_context(lines)
         analysis = Analysis(
-            engagement, lines, build_findings(lines, self.config), intake=intake, raw=raw
+            engagement,
+            lines,
+            build_findings(lines, self.config, context=context),
+            intake=intake,
+            raw=raw,
+            context=context,
         )
         self.analyses[engagement.id] = analysis
         return analysis
@@ -196,13 +225,15 @@ class Workspace:
                 logger.error("rebuilt ledger hash differs source_id=%s", source.id)
                 continue
 
+            context = build_context(normalised.lines)
             return Analysis(
                 engagement,
                 normalised.lines,
-                build_findings(normalised.lines, self.config),
+                build_findings(normalised.lines, self.config, context=context),
                 intake=normalised.report,
                 raw=raw,
                 source=source,
+                context=context,
             )
 
         raise HTTPException(

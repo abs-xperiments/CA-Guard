@@ -26,8 +26,19 @@ import {
   X,
 } from "lucide-react";
 import { ApiError, api } from "@/lib/api";
-import type { Decision, Explanation, Finding, LedgerLine, ReviewAction } from "@/lib/types";
+import type { Decision, Explanation, Finding, ReviewAction } from "@/lib/types";
 import { concernLabel, ukDate } from "@/lib/types";
+import {
+  CardPlaceholder,
+  CardSummary,
+  ComparablesSection,
+  EvidenceSection,
+  NextStepsSection,
+  Section,
+  SignalsSection,
+  Transaction,
+  sourceRows,
+} from "./FindingCard";
 import { SourcePreview } from "./SourcePreview";
 import { useToast } from "./Toast";
 import { BandBadge, Button, EvidenceMeter, Key, StatusLabel, cx, shortcutBlocked } from "./ui";
@@ -45,6 +56,8 @@ interface Props {
   onClose: () => void;
   onDecided: (decision: Decision) => void;
   onAdvance: () => boolean;
+  /** Open another flagged voucher — used by the "similar entries" list. */
+  onOpenVoucher?: (voucherId: string) => void;
 }
 
 export function EvidenceDrawer({
@@ -53,6 +66,7 @@ export function EvidenceDrawer({
   onClose,
   onDecided,
   onAdvance,
+  onOpenVoucher,
 }: Props) {
   const toast = useToast();
   const [note, setNote] = useState("");
@@ -66,6 +80,7 @@ export function EvidenceDrawer({
   // with the transaction and where it sits in the file, is fetched on open.
   const [detail, setDetail] = useState<Finding | null>(null);
   const [viewingFile, setViewingFile] = useState(false);
+  const card = detail?.card ?? null;
   const panel = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -196,51 +211,63 @@ export function EvidenceDrawer({
       </header>
 
       <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
-        <Section title="Why this was flagged" count={finding.signals.length}>
-          <ul className="space-y-2.5">
-            {finding.signals.map((signal) => (
-              <li
-                key={signal.kind}
-                className="rounded-md border border-line bg-canvas/50 px-3 py-2.5"
-              >
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="text-[13px] font-semibold text-ink">
-                    {concernLabel(signal.kind)}
-                  </span>
-                  <span
-                    className="tabular shrink-0 text-[11px] text-ink-faint"
-                    title="How much this contributed to the priority"
-                  >
-                    {(signal.contribution * 100).toFixed(0)}%
-                  </span>
-                </div>
-                <p className="mt-1 text-[13px] leading-relaxed text-ink-muted">
-                  {signal.reason}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </Section>
+        {card ? <CardSummary card={card} /> : null}
 
-        <Section title="Evidence trail">
-          <div className="rounded-md border border-line px-3 py-3">
-            <div className="flex items-center justify-between">
-              <EvidenceMeter completeness={finding.evidence.completeness} />
-              <span className="text-[13px] text-ink-muted">
-                {finding.evidence.summary}
-              </span>
+        {card ? (
+          <>
+            <SignalsSection card={card} />
+            <EvidenceSection card={card} />
+          </>
+        ) : (
+          <>
+          <CardPlaceholder />
+          <Section title="Why this was flagged" count={finding.signals.length}>
+            <ul className="space-y-2.5">
+              {finding.signals.map((signal) => (
+                <li
+                  key={signal.kind}
+                  className="rounded-md border border-line bg-canvas/50 px-3 py-2.5"
+                >
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-[13px] font-semibold text-ink">
+                      {concernLabel(signal.kind)}
+                    </span>
+                    <span
+                      className="tabular shrink-0 text-[11px] text-ink-faint"
+                      title="How much this contributed to the priority"
+                    >
+                      {(signal.contribution * 100).toFixed(0)}%
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[13px] leading-relaxed text-ink-muted">
+                    {signal.reason}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </Section>
+
+          <Section title="Evidence trail">
+            <div className="rounded-md border border-line px-3 py-3">
+              <div className="flex items-center justify-between">
+                <EvidenceMeter completeness={finding.evidence.completeness} />
+                <span className="text-[13px] text-ink-muted">
+                  {finding.evidence.summary}
+                </span>
+              </div>
+              <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-3">
+                <Present label="Document" present={finding.evidence.has_document} />
+                <Present
+                  label="Approval"
+                  present={finding.evidence.has_approval}
+                  expected={finding.evidence.approval_expected}
+                />
+                <Present label="Narration" present={finding.evidence.has_narration} />
+              </dl>
             </div>
-            <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-3">
-              <Present label="Document" present={finding.evidence.has_document} />
-              <Present
-                label="Approval"
-                present={finding.evidence.has_approval}
-                expected={finding.evidence.approval_expected}
-              />
-              <Present label="Narration" present={finding.evidence.has_narration} />
-            </dl>
-          </div>
-        </Section>
+          </Section>
+          </>
+        )}
 
         <Section title="The transaction">
           {detail && detail.lines.length ? (
@@ -284,7 +311,10 @@ export function EvidenceDrawer({
           ) : null}
         </Section>
 
-        <Section title="Plain-language explanation">
+        {card ? <ComparablesSection card={card} onOpen={onOpenVoucher} /> : null}
+        {card ? <NextStepsSection card={card} /> : null}
+
+        <Section title="In a paragraph">
           {explanation ? (
             <div className="rounded-md border border-line bg-canvas/50 px-3 py-3">
               <p className="whitespace-pre-line text-[13px] leading-relaxed text-ink">
@@ -497,30 +527,6 @@ function DecisionButton({
   );
 }
 
-function Section({
-  title,
-  count,
-  children,
-}: {
-  title: string;
-  count?: number;
-  children: React.ReactNode;
-}) {
-  return (
-    <section>
-      <h3 className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
-        {title}
-        {count !== undefined ? (
-          <span className="rounded-full bg-canvas px-1.5 text-[10px] text-ink-muted ring-1 ring-inset ring-line">
-            {count}
-          </span>
-        ) : null}
-      </h3>
-      {children}
-    </section>
-  );
-}
-
 function Present({
   label,
   present,
@@ -550,90 +556,4 @@ function Present({
       </dd>
     </div>
   );
-}
-
-/** The voucher's lines as a reviewer reads a journal: account, debit, credit, narration. */
-function Transaction({ lines }: { lines: LedgerLine[] }) {
-  const narrations = Array.from(
-    new Set(lines.map((line) => line.narration).filter((n): n is string => Boolean(n))),
-  );
-  const references = Array.from(
-    new Set(lines.map((line) => line.document_ref).filter((r): r is string => Boolean(r))),
-  );
-  const first = lines[0];
-  return (
-    <div className="overflow-hidden rounded-md border border-line">
-      <table className="w-full text-[12px]">
-        <thead className="bg-canvas text-ink-faint">
-          <tr>
-            <th className="px-3 py-1.5 text-left font-medium">Account</th>
-            <th className="px-3 py-1.5 text-right font-medium">Debit</th>
-            <th className="px-3 py-1.5 text-right font-medium">Credit</th>
-            <th className="px-3 py-1.5 text-right font-medium" title="Row in the uploaded file">
-              Row
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {lines.map((line) => (
-            <tr key={line.line_id} className="border-t border-line">
-              <td className="px-3 py-1.5">
-                <span className="text-ink">{line.account_name || "—"}</span>
-                <span className="ml-1.5 font-mono text-[11px] text-ink-faint">
-                  {line.account_code}
-                </span>
-              </td>
-              <td className="tabular px-3 py-1.5 text-right text-ink">{line.debit_display}</td>
-              <td className="tabular px-3 py-1.5 text-right text-ink">{line.credit_display}</td>
-              <td className="tabular px-3 py-1.5 text-right text-ink-faint">
-                {line.source_row?.toLocaleString("en-IN") ?? "—"}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-1 border-t border-line bg-canvas/40 px-3 py-2.5 text-[12px]">
-        <dt className="text-ink-faint">Narration</dt>
-        <dd className="text-ink">
-          {narrations.length ? narrations.join(" · ") : <Absent>none recorded</Absent>}
-        </dd>
-        <dt className="text-ink-faint">Document ref.</dt>
-        <dd className="text-ink">
-          {references.length ? references.join(", ") : <Absent>none recorded</Absent>}
-        </dd>
-        <dt className="text-ink-faint">Prepared by</dt>
-        <dd className="text-ink">{first?.created_by ?? <Absent>not recorded</Absent>}</dd>
-        <dt className="text-ink-faint">Approved by</dt>
-        <dd className="text-ink">{first?.approved_by ?? <Absent>not recorded</Absent>}</dd>
-        {first?.posted_at ? (
-          <>
-            <dt className="text-ink-faint">Entered</dt>
-            <dd className="tabular text-ink">
-              {ukDate(first.posted_at.slice(0, 10))} {first.posted_at.slice(11, 16)}
-            </dd>
-          </>
-        ) : null}
-        {first?.voucher_type ? (
-          <>
-            <dt className="text-ink-faint">Voucher type</dt>
-            <dd className="text-ink">{first.voucher_type.replace(/_/g, " ")}</dd>
-          </>
-        ) : null}
-      </dl>
-    </div>
-  );
-}
-
-function Absent({ children }: { children: string }) {
-  return <span className="text-ink-faint italic">{children}</span>;
-}
-
-/** " · rows 1,842–1,843" — where in the file this voucher sits. */
-function sourceRows(lines: LedgerLine[]): string {
-  const rows = lines.map((line) => line.source_row).filter((r): r is number => r !== null);
-  if (!rows.length) return "";
-  const low = Math.min(...rows);
-  const high = Math.max(...rows);
-  const fmt = (n: number) => n.toLocaleString("en-IN");
-  return low === high ? ` · row ${fmt(low)}` : ` · rows ${fmt(low)}–${fmt(high)}`;
 }

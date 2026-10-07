@@ -139,8 +139,8 @@ def test_guard_accepts_a_faithful_rendering(finding: Finding) -> None:
     facts = finding.structured_facts()
     text = (
         f"Voucher {facts['voucher_id']} is flagged for review. "
-        f"{facts['signals'][0]['reason']} "
-        "The evidence trail is incomplete."
+        + " ".join(signal["reason"] for signal in facts["signals"])
+        + " The evidence trail is incomplete."
     )
     assert check_grounding(text, facts).passed
 
@@ -217,11 +217,23 @@ def test_service_uses_the_deterministic_path_with_no_model(finding: Finding) -> 
 
 def test_service_uses_generated_text_when_it_is_grounded(finding: Finding) -> None:
     facts = finding.structured_facts()
-    grounded = f"Voucher {facts['voucher_id']} needs review. {facts['signals'][0]['reason']}"
+    grounded = f"Voucher {facts['voucher_id']} needs review. " + " ".join(finding.reasons)
     result = ExplanationService(StubProvider(responses=[grounded])).explain(finding)
     assert result.source is Source.MODEL
     assert result.guard is not None and result.guard.passed
     assert DISCLAIMER in result.text
+
+
+def test_service_falls_back_when_the_model_leaves_a_concern_out(finding: Finding) -> None:
+    """A concern the prose drops is invisible to the reviewer who reads it."""
+    major = [s for s in finding.structured_facts()["signals"] if s["contribution"] >= 0.05]
+    assert len(major) >= 2, "the fixture needs a finding with several concerns"
+    partial = f"Voucher {finding.voucher_id} needs review. {major[0]['reason']}"
+
+    result = ExplanationService(StubProvider(responses=[partial])).explain(finding)
+
+    assert result.source is Source.DETERMINISTIC
+    assert "concerns left out" in (result.fallback_reason or "")
 
 
 def test_service_falls_back_when_the_model_invents_a_number(finding: Finding) -> None:
@@ -270,7 +282,9 @@ def test_every_finding_gets_an_explanation(findings: list[Finding]) -> None:
 
 def test_provenance_is_honest(finding: Finding) -> None:
     generated = ExplanationService(
-        StubProvider(responses=[f"Voucher {finding.voucher_id} needs review."])
+        StubProvider(
+            responses=[f"Voucher {finding.voucher_id} needs review. " + " ".join(finding.reasons)]
+        )
     ).explain(finding)
     assert "checked before display" in generated.provenance()
     assert "CA-Guard" in ExplanationService().explain(finding).provenance()
@@ -355,7 +369,10 @@ def test_a_faithful_model_is_accepted(findings: list[Finding]) -> None:
 
     sample = findings[:5]
     good = StubProvider(
-        responses=[f"Voucher {f.voucher_id} is flagged for review. {f.reasons[0]}" for f in sample],
+        # Faithful means every concern: the prompt requires it and the guard checks it.
+        responses=[
+            f"Voucher {f.voucher_id} is flagged for review. " + " ".join(f.reasons) for f in sample
+        ],
         label="good",
     )
     frame = compare_providers(sample, {"faithful": good})

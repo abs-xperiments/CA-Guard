@@ -42,6 +42,7 @@ from caguard.auth import UserStore
 from caguard.auth.sessions import load_or_create_key
 from caguard.auth.users import User
 from caguard.detect.types import DetectorConfig
+from caguard.explain.card import build_card
 from caguard.intake.normalise import normalise
 from caguard.intake.readers import (
     MAX_UPLOAD_BYTES,
@@ -153,11 +154,24 @@ def create_app(
         if found is None:
             raise HTTPException(404, f"No finding for voucher {voucher_id!r}")
         current = workspace.store.current(engagement_id).get(voucher_id)
+        card = (
+            build_card(
+                found,
+                analysis.context,
+                account_names=analysis.account_names,
+                not_in_file=analysis.not_in_file,
+                flagged=analysis.flagged,
+                config=workspace.config,
+            )
+            if analysis.context is not None
+            else None
+        )
         return FindingOut.build(
             found,
             current,
             lines=analysis.lines_for(voucher_id),
             source=analysis.source,
+            card=card,
         )
 
     @app.get(

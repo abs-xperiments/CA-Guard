@@ -64,7 +64,14 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
       return;
     }
     try {
-      setQueue(await api.queue(id));
+      const loaded = await api.queue(id);
+      setQueue(loaded);
+      // A link to a finding (?finding=V003034) opens it, so a reviewer can
+      // refresh, or send a colleague straight to the entry they mean.
+      const linked = new URLSearchParams(window.location.search).get("finding");
+      if (linked && loaded.findings.some((f) => f.voucher_id === linked)) {
+        setSelected(linked);
+      }
     } catch (caught) {
       setNeedsLedger(caught instanceof ApiError && caught.status === 409);
       setError(caught instanceof ApiError ? caught.message : "Could not load the review.");
@@ -74,6 +81,16 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Keep the address in step with the open finding. replaceState, not a push:
+  // moving through a queue should not fill the back button with every voucher.
+  useEffect(() => {
+    if (!queue) return;
+    const url = new URL(window.location.href);
+    if (selected) url.searchParams.set("finding", selected);
+    else url.searchParams.delete("finding");
+    window.history.replaceState(null, "", url);
+  }, [queue, selected]);
 
   const visible = useMemo(() => {
     if (!queue) return [];
@@ -369,6 +386,7 @@ export default function ReviewPage({ params }: { params: Promise<{ id: string }>
             engagementId={id}
             finding={openFinding}
             onClose={() => setSelected(null)}
+            onOpenVoucher={setSelected}
             onDecided={applyDecision}
             onAdvance={advance}
           />

@@ -96,12 +96,21 @@ def detect_amount_outlier(ctx: LedgerContext, cfg: DetectorConfig) -> list[Signa
     """
     deviation = amount_deviation(ctx)
     account_of = ctx.vouchers.debit_accounts.map(lambda s: min(s) if s else "")
+    # The comparison group, described in money a reviewer can check: the same
+    # grouping the deviation was measured against, so the working shown is the
+    # working used.
+    by_account = ctx.vouchers.amount_paise.astype("float64").groupby(account_of)
+    group_median = by_account.median()
+    group_low = by_account.quantile(0.10)
+    group_high = by_account.quantile(0.90)
+    group_size = by_account.size()
 
     hits: list[SignalHit] = []
     for voucher_id, score in deviation.items():
         if score < cfg.amount_deviation_threshold:
             continue
         row = ctx.vouchers.loc[voucher_id]
+        account = account_of[voucher_id]
         hits.append(
             SignalHit(
                 voucher_id=str(voucher_id),
@@ -117,6 +126,10 @@ def detect_amount_outlier(ctx: LedgerContext, cfg: DetectorConfig) -> list[Signa
                     "robust_deviations": round(float(score), 2),
                     "threshold": cfg.amount_deviation_threshold,
                     "measure": "median absolute deviation of log10 amount",
+                    "account_median_paise": round(float(group_median[account])),
+                    "typical_low_paise": round(float(group_low[account])),
+                    "typical_high_paise": round(float(group_high[account])),
+                    "entries_compared": int(group_size[account]),
                 },
             )
         )

@@ -22,6 +22,8 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Any
 
+from caguard.explain.vocabulary import VOCABULARY, is_minor, mentions
+
 #: Language that asserts a conclusion CA-Guard is not entitled to reach.
 #: Matched on word boundaries so "proven" is caught and "approval" is not.
 FORBIDDEN_PHRASES: tuple[str, ...] = (
@@ -73,6 +75,7 @@ class GuardResult:
     unsupported_numbers: tuple[str, ...] = ()
     forbidden_phrases: tuple[str, ...] = ()
     notes: tuple[str, ...] = field(default_factory=tuple)
+    omitted_concerns: tuple[str, ...] = ()
 
     @property
     def violations(self) -> tuple[str, ...]:
@@ -83,6 +86,8 @@ class GuardResult:
             )
         if self.forbidden_phrases:
             found.append("language asserting a conclusion: " + ", ".join(self.forbidden_phrases))
+        if self.omitted_concerns:
+            found.append("concerns left out: " + ", ".join(self.omitted_concerns))
         found.extend(self.notes)
         return tuple(found)
 
@@ -107,13 +112,34 @@ def check_grounding(text: str, facts: dict[str, Any]) -> GuardResult:
 
     lowered = stripped.lower()
     forbidden = tuple(phrase for phrase in FORBIDDEN_PHRASES if _mentions(lowered, phrase))
+    omitted = omitted_concerns(stripped, facts)
 
     return GuardResult(
-        passed=not unsupported and not forbidden and not notes,
+        passed=not unsupported and not forbidden and not notes and not omitted,
         unsupported_numbers=unsupported,
         forbidden_phrases=forbidden,
         notes=tuple(notes),
+        omitted_concerns=omitted,
     )
+
+
+def omitted_concerns(text: str, facts: dict[str, Any]) -> tuple[str, ...]:
+    """Concerns the text never mentions.
+
+    A reviewer acts on what they read; a concern the prose drops is invisible to
+    them. Minor signals (below the display floor) are exempt — they are "also
+    noted" on the card and need not lead the prose.
+    """
+    missing: list[str] = []
+    for signal in facts.get("signals", []):
+        kind = str(signal.get("kind", ""))
+        if kind not in {k.value for k in VOCABULARY}:
+            continue
+        if is_minor(float(signal.get("contribution", 0.0))):
+            continue
+        if not mentions(text, kind):
+            missing.append(kind)
+    return tuple(sorted(set(missing)))
 
 
 def supported_numbers(facts: dict[str, Any]) -> set[str]:
