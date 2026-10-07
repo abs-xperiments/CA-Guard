@@ -1,6 +1,6 @@
 # CA-Guard — Final Completion Plan
 
-**Audit date:** 2026-10-07 21:10 IST · **Baseline commit:** `695e904` · **Status:** audit complete, implementation not started
+**Audit date:** 2026-10-07 21:10 IST · **Baseline commit:** `695e904` · **Status:** audit complete; founder decisions answered; Phase 1 in progress
 
 This plan comes from a full re-sync with the repository. That meant reading the code, docs, ADRs and journal, then actually *running* the product: the CLI, the API, the Next.js workspace in a browser, and the benchmark. Every defect below was reproduced, not inferred. Where something was not verified, it says so.
 
@@ -277,7 +277,14 @@ Also covered:
 
 ---
 
-## 6. Founder decisions needed
+## 6. Founder decisions
+
+**Answered 2026-10-07 21:25 IST** — see D-053, D-054, D-055 in `DECISION_LOG.md`:
+- **FD-1 → Railway only.** Netlify is not used. Phase 9 needs your Railway account at that point.
+- **FD-2 → Keep originals until deleted, everywhere** (no automatic expiry on the demo either).
+- **FD-3 → "Exception — follow up" / "Cleared — not a concern" / "Investigate".**
+
+The options as originally put:
 
 | ID | Decision | Blocks | Recommendation |
 |---|---|---|---|

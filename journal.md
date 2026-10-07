@@ -648,3 +648,13 @@ Before changing anything, I re-read the whole project. Then I actually *used* it
 **Credentials needed:** none yet. Only once you choose a host.
 
 **Next step:** Phase 1, the critical fixes. None of them depend on your decisions, so they can start immediately.
+
+---
+
+## 2026-10-07 21:25 IST — [DECIDED] Your three answers are recorded.
+
+- **Hosting: Railway only.** No Netlify. I'll ask for the Railway account step when we reach deployment (Phase 9). Nothing is being spent before then.
+- **Uploaded files: kept until someone deletes the engagement**, both on a firm's own machine and on the demo. A firm's retention policy (seven years under the audit documentation rules) stays the firm's call.
+- **Buttons:** "Exception — follow up", "Cleared — not a concern", "Investigate". Decisions already saved keep their meaning, because only the labels change.
+
+**Next step:** Phase 1, the critical fixes.
