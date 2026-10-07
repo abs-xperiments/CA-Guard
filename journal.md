@@ -961,3 +961,21 @@ A first build found one missing system library, which the new crash handling exp
 **Founder action required:** the numbered steps are in my message. Nothing else is needed from you. Once you're signed in, I do the rest and then test the live site end to end (Phase 10).
 
 **Tests/checks:** 678 tests ✅ · 4 browser tests ✅ · container: functional, restart, crash and demo-mode checks ✅
+
+---
+
+## 2026-10-08 02:10 IST — [PHASE 9 of completion] [BLOCKED] Railway accepted the upload but will not start the build.
+
+**What's done on Railway** (account narayananshalini21@gmail.com, which you confirmed):
+- a new project **ca-guard-demo**, separate from the existing "lead-decision-intelligence", which is untouched;
+- a service, **ca-guard**;
+- settings: demo mode on, HTTPS-only cookies, and a 24-character invite code (generated straight into Railway, never shown or saved here);
+- a storage volume at /data.
+
+**One fix before deploying.** Railway mounts storage owned by the administrator account, so CA-Guard, which deliberately runs as an ordinary user, couldn't have written to it. I reproduced that on this Mac, and fixed it so the app still never runs with administrator rights (checked: every CA-Guard process runs with zero privileges).
+
+**What's blocking:** two deploy attempts were uploaded, and both failed at "scheduling build" before the build began. The same image builds and runs perfectly here, so this is almost certainly the Railway account (plan, trial credit or verification), not CA-Guard. The command-line tool can't see billing, so this needs you in the Railway dashboard.
+
+**Also worth knowing:** this Mac's shell has an old `RAILWAY_TOKEN` setting that overrides your login. I worked around it for my commands; removing it from your shell profile will stop it confusing future Railway commands.
+
+**Founder action required:** the steps are in my message.
